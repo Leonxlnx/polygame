@@ -1,0 +1,21 @@
+{
+  "name": "hearthwild",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "An open-source low-poly browser game about building a camp and opening a wild valley step by step.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "three": "^0.177.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.177.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

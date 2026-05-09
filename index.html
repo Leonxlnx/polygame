@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Hearthwild is an open-source 2.5D web game prototype built with Three.js and TypeScript."
+    />
+    <title>Hearthwild</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas" aria-label="Hearthwild playable world"></canvas>
+      <div id="hud" aria-live="polite">
+        <div class="health-cluster" aria-label="Health">
+          <div id="heart-row" class="heart-row" aria-label="Health"></div>
+        </div>
+        <div class="resource-dock" aria-label="Resources">
+          <div class="region-chip"><span id="chapter-value">Morning Cove</span><strong id="region-value">First Camp</strong></div>
+          <span class="resource-chip resource-wood"><i aria-hidden="true"></i><span>Wood</span><strong id="wood-value">0</strong></span>
+          <span class="resource-chip resource-stone"><i aria-hidden="true"></i><span>Stone</span><strong id="stone-value">0</strong></span>
+          <span class="resource-chip resource-herb"><i aria-hidden="true"></i><span>Herb</span><strong id="herb-value">0</strong></span>
+          <span class="resource-chip resource-coin"><i aria-hidden="true"></i><span>Coin</span><strong id="coin-value">0</strong></span>
+        </div>
+        <div id="quest-panel" class="quest-panel">
+          <div class="quest-title">Next Step</div>
+          <div id="objective-value" class="objective-value">Follow the morning path.</div>
+          <div id="quest-list" class="quest-list"></div>
+          <div class="camp-meter" aria-label="Camp progress">
+            <span>Camp</span>
+            <strong id="camp-value">0</strong>
+          </div>
+        </div>
+        <div id="inventory-panel" class="inventory-panel is-hidden">
+          <div class="panel-title">Pack</div>
+          <div id="inventory-summary" class="inventory-summary"></div>
+          <div class="build-note">Tools unlock through the trail tutorial.</div>
+        </div>
+        <div id="interact-prompt" class="interact-prompt is-hidden"></div>
+        <div id="toast" class="toast is-hidden"></div>
+        <div id="chapter-card" class="chapter-card is-hidden" aria-live="polite">
+          <span id="chapter-card-title">Chapter 1</span>
+          <strong id="chapter-card-text">Morning Cove</strong>
+        </div>
+        <div id="dialogue-panel" class="dialogue-panel is-hidden" role="dialog" aria-live="polite">
+          <div class="dialogue-portrait" aria-hidden="true">
+            <span class="portrait-hair"></span>
+            <span class="portrait-face"></span>
+            <span class="portrait-eye portrait-eye-left"></span>
+            <span class="portrait-eye portrait-eye-right"></span>
+            <span class="portrait-mouth"></span>
+            <span class="portrait-shoulders"></span>
+          </div>
+          <div class="dialogue-body">
+            <div id="dialogue-speaker" class="dialogue-speaker">Edda</div>
+            <p id="dialogue-text"></p>
+            <span id="dialogue-continue" class="dialogue-continue">Click</span>
+          </div>
+        </div>
+        <div class="hotbar" aria-label="Action bar">
+          <div class="slot slot-hands is-ready"><span>1</span><i aria-hidden="true"></i><strong>Hands</strong></div>
+          <div class="slot slot-tool"><span>2</span><i aria-hidden="true"></i><strong>Tool</strong></div>
+          <div class="slot slot-build"><span>3</span><i aria-hidden="true"></i><strong>Build</strong></div>
+          <div class="slot slot-attack"><span>4</span><i aria-hidden="true"></i><strong>Swing</strong></div>
+          <div class="slot slot-pack is-ready"><span>I</span><i aria-hidden="true"></i><strong>Pack</strong></div>
+        </div>
+      </div>
+      <section id="main-menu" class="screen screen-menu" aria-label="Main menu">
+        <button class="settings-button" type="button" aria-label="Settings">Settings</button>
+        <div class="menu-copy">
+          <h1>Hearthwild</h1>
+          <p class="menu-line">A quiet valley before the first trail.</p>
+          <div class="menu-actions">
+            <button id="play-button" class="primary-action" type="button">Play</button>
+          </div>
+        </div>
+      </section>
+      <section id="loading-screen" class="screen loading-screen is-hidden" aria-label="Loading">
+        <div class="loader-card" aria-live="polite">
+          <div class="loader-mark"></div>
+          <p>The morning path is waking.</p>
+          <div class="loader-track"><span id="loading-progress"></span></div>
+        </div>
+      </section>
+      <section id="character-select" class="screen character-screen is-hidden" aria-label="Character selection">
+        <div class="character-panel">
+          <div class="character-topline">
+            <span class="eyebrow">Choose</span>
+            <span id="character-index" class="character-index">01 / 05</span>
+          </div>
+          <div class="character-copy">
+            <h2 id="character-name">Mara</h2>
+            <p id="character-role" class="role-line">Trail runner</p>
+            <p id="character-description" class="character-description">Short swept hair and a calm, practical build.</p>
+          </div>
+          <div class="color-row">
+            <div class="color-selector" aria-label="Character palette">
+              <button id="prev-color" class="mini-action" type="button" aria-label="Previous palette">‹</button>
+              <span id="color-preview" class="color-preview" aria-hidden="true"></span>
+              <span id="character-color-name" class="color-name">Forest</span>
+              <button id="next-color" class="mini-action" type="button" aria-label="Next palette">›</button>
+            </div>
+          </div>
+          <div class="selection-actions">
+            <button id="prev-character" class="icon-action" type="button" aria-label="Previous character">‹</button>
+            <button id="select-character" class="primary-action" type="button">Select</button>
+            <button id="next-character" class="icon-action" type="button" aria-label="Next character">›</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
