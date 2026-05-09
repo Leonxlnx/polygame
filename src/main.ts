@@ -8,6 +8,7 @@ const loadingScreen = document.querySelector<HTMLElement>("#loading-screen");
 const characterSelect = document.querySelector<HTMLElement>("#character-select");
 const playButton = document.querySelector<HTMLButtonElement>("#play-button");
 const loadingProgress = document.querySelector<HTMLElement>("#loading-progress");
+const loadingCopy = document.querySelector<HTMLElement>("#loading-copy");
 const prevCharacter = document.querySelector<HTMLButtonElement>("#prev-character");
 const nextCharacter = document.querySelector<HTMLButtonElement>("#next-character");
 const selectCharacter = document.querySelector<HTMLButtonElement>("#select-character");
@@ -38,6 +39,7 @@ if (
   !characterSelect ||
   !playButton ||
   !loadingProgress ||
+  !loadingCopy ||
   !prevCharacter ||
   !nextCharacter ||
   !selectCharacter ||
@@ -87,6 +89,7 @@ const app = new GameApp({
     characterSelect,
     playButton,
     loadingProgress,
+    loadingCopy,
     prevCharacter,
     nextCharacter,
     selectCharacter,

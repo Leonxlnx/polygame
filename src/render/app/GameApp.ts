@@ -33,6 +33,7 @@ type GameUi = {
   characterSelect: HTMLElement;
   playButton: HTMLButtonElement;
   loadingProgress: HTMLElement;
+  loadingCopy: HTMLElement;
   prevCharacter: HTMLButtonElement;
   nextCharacter: HTMLButtonElement;
   selectCharacter: HTMLButtonElement;
@@ -119,6 +120,12 @@ type DialogueState = {
   visibleCharacters: number;
   lineComplete: boolean;
 };
+
+const loadingLines = [
+  "Laying the first trail stones.",
+  "Packing the morning tools.",
+  "Warming the valley light.",
+] as const;
 
 export class GameApp {
   private readonly renderer: THREE.WebGLRenderer;
@@ -333,10 +340,12 @@ export class GameApp {
     this.phase = "loading";
     this.loadingElapsed = 0;
     this.ui.loadingProgress.style.width = "0%";
+    this.ui.loadingCopy.textContent = loadingLines[0];
     this.clearLoadingTimers();
     this.loadingProgressTimeout = window.setTimeout(() => {
       if (this.phase === "loading") {
         this.ui.loadingProgress.style.width = "100%";
+        this.ui.loadingCopy.textContent = loadingLines[1];
       }
     }, 30);
     this.loadingTimeout = window.setTimeout(() => {

@@ -200,8 +200,11 @@ function performAttack(state: GameState): void {
     state.quest.tutorialStage = "gatherHerbs";
     showMessage(state, "Swing checked. Edda wants three herbs next.");
     requestDialogue(state, "Edda", [
-      "Good. Your weight moved forward this time.",
-      "Before the trail opens, gather three valley herbs from the path edge.",
+      "Good. That swing had a beginning, a strike, and an end. That matters more than speed.",
+      "A wild trail punishes panic. If your feet chase the sword, you lose the ground.",
+      "From now on, every tool has a rhythm: pick up, wind up, strike, recover, read the world again.",
+      "Before the lower trail opens, gather three valley herbs from the path edge.",
+      "The pale flowers are not treasure. They are proof that you can notice small things while moving.",
       "We will light a small campfire after that. A warm camp tells travelers they can return.",
     ]);
     return;
@@ -476,8 +479,11 @@ function buildCampStructure(state: GameState): void {
   state.quest.tutorialStage = "practiceSwing";
   showMessage(state, "Shelter placed.");
   requestDialogue(state, "Edda", [
-    "That gives the camp a center.",
+    "That gives the camp a center. Not a city yet. Just a place the valley can remember.",
+    "The first rule of building out here is simple: never build so much that you stop seeing the path.",
+    "A roof means rest. A camp means return. Return means you can risk going farther.",
     "Before the trail opens, practice one clean swing. Just one. Feet forward, weight low.",
+    "You are not trying to look heroic. You are trying to stay balanced when the world pushes back.",
   ]);
 }
 
@@ -510,7 +516,10 @@ function buildCampfire(state: GameState): void {
   showMessage(state, "Campfire lit. The lower trail is open.");
   requestDialogue(state, "Edda", [
     "Now the camp has smoke, shelter, tools, and a reason to return.",
-    "The lower trail is open. Stay patient, watch the ground, and only fight when you choose the angle.",
+    "That is the difference between wandering and exploring: a place behind you that still matters.",
+    "The lower trail is open. You can follow it, ignore it, circle the rocks, or come back with better tools.",
+    "Fight only when you choose the angle. Gather when the path offers something useful. Build when the land asks for a mark.",
+    "If the valley feels quiet, good. Quiet means you can hear what changed.",
   ]);
 }
 
@@ -679,9 +688,12 @@ function talkToGuide(state: GameState): void {
     case "walkToGuide":
       state.quest.tutorialStage = "intro";
       requestDialogue(state, "Edda", [
-        "You found the ridge path. Good.",
+        "You found the ridge path. Good. Most people look for a signpost and miss the road under them.",
+        "This valley is old enough to look empty on purpose.",
         "Before we build anything, learn the ground under your feet.",
-        "Gather five pieces of fallen wood from the path edge, then come back.",
+        "Loose wood first. Fallen wood, not living trees. We do not take from the forest before we can replace it.",
+        "Gather five pieces from the path edge, then come back.",
+        "If something blocks your feet after it is gone, tell me. The world should keep its promises.",
       ]);
       showMessage(state, "Edda marked the first task.");
       break;
@@ -689,7 +701,10 @@ function talkToGuide(state: GameState): void {
       state.quest.tutorialStage = "gatherWood";
       requestDialogue(state, "Edda", [
         "Morning. The ridge kept the valley quiet through the night.",
+        "Quiet is not safe. It just gives you space to think.",
         "Start simple: gather five pieces of fallen wood from the edge of the path, then come back to me.",
+        "Do not chase every flower, stone, and shadow yet. A good trail teaches one useful verb at a time.",
+        "Wood is the first verb. Pick it up, hear the pack answer, watch the resource move home.",
       ]);
       showMessage(state, "Edda marked the first task.");
       break;
@@ -697,14 +712,18 @@ function talkToGuide(state: GameState): void {
       requestDialogue(state, "Edda", [
         `You have ${Math.min(state.resources.wood, state.quest.woodTarget)} of ${state.quest.woodTarget} wood.`,
         "Stay near the path. Fallen logs are enough for the first tool.",
+        "The living trees can wait until we have an axe and a reason.",
+        "If you want freedom, earn clean tools first. Then the valley opens without becoming noise.",
       ]);
       break;
     case "returnWood":
       state.quest.woodDelivered = true;
       state.quest.tutorialStage = "craftPickaxe";
       requestDialogue(state, "Edda", [
-        "Good. Keep the wood in your pack.",
+        "Good. Keep the wood in your pack. A pack is not a menu; it is memory you can spend.",
         "Use the workbench beside the ridge. Three pieces will become a wooden pick.",
+        "The pick will not make you strong. It gives your hand a better question to ask stone.",
+        "Press the tool slot when it appears. The slot should answer you now.",
       ]);
       showMessage(state, "Workbench unlocked.");
       break;
@@ -712,12 +731,15 @@ function talkToGuide(state: GameState): void {
       requestDialogue(state, "Edda", [
         "The workbench is ready.",
         "Make the wooden pick before you try the stones.",
+        "The valley has rules. Good rules are not walls; they tell you what would make sense next.",
       ]);
       break;
     case "mineStone":
       requestDialogue(state, "Edda", [
         `You have ${Math.min(state.resources.stone, state.quest.stoneTarget)} of ${state.quest.stoneTarget} stone.`,
         "Only the small loose stones for now. The larger ridge can wait.",
+        "A stone should shrink, crack, and then stop blocking the path when it is gone.",
+        "If the pick feels slow, that is deliberate. A strike without recovery is just noise.",
       ]);
       break;
     case "returnStone":
@@ -725,7 +747,10 @@ function talkToGuide(state: GameState): void {
       state.quest.tutorialStage = "buildShelter";
       requestDialogue(state, "Edda", [
         "Good. Stone anchors what wood begins.",
-        "Use two wood and one stone to place a small shelter beside the ridge. A camp needs a first shape.",
+        "Now we stop collecting for a moment and change the world on purpose.",
+        "Use two wood and one stone to place a small shelter beside the ridge.",
+        "A camp needs a first shape. Not a perfect shape. A useful one.",
+        "Build close enough to return to, but not so close that you trip over your own work.",
       ]);
       showMessage(state, "Shelter plan unlocked.");
       break;
@@ -733,18 +758,21 @@ function talkToGuide(state: GameState): void {
       requestDialogue(state, "Edda", [
         "Place the shelter close enough to the ridge that the wind breaks around it.",
         "Two wood. One stone. Keep it simple.",
+        "Good building is boring until the moment you need it. Then it feels like magic.",
       ]);
       break;
     case "practiceSwing":
       requestDialogue(state, "Edda", [
         "Not a fight. Just one clean swing.",
         "Lean into the motion, then recover. That is how you stay on your feet.",
+        "Watch your right hand. If the sword appears, the game is finally telling the truth.",
       ]);
       break;
     case "gatherHerbs":
       requestDialogue(state, "Edda", [
         `You have ${Math.min(state.resources.herb, state.quest.herbTarget)} of ${state.quest.herbTarget} herbs.`,
         "Look for the pale flowers and low green patches along the path edge.",
+        "Herbs are the first quiet reward. They do not shout like coins, but they keep a camp alive.",
       ]);
       break;
     case "returnHerbs":
@@ -752,7 +780,9 @@ function talkToGuide(state: GameState): void {
       state.quest.tutorialStage = "buildCampfire";
       requestDialogue(state, "Edda", [
         "Good. The herb smoke keeps the night insects away.",
-        "Build a small campfire now. Two wood, one stone, one herb. If you spent the wood, gather more from fallen logs.",
+        "Now build a small campfire: two wood, one stone, one herb.",
+        "If you spent the wood, gather more from fallen logs. A good system lets you recover from waste.",
+        "When the fire is lit, the lower trail opens. That is when choice starts to matter.",
       ]);
       showMessage(state, "Campfire plan unlocked.");
       break;
@@ -760,12 +790,16 @@ function talkToGuide(state: GameState): void {
       requestDialogue(state, "Edda", [
         "A campfire is not decoration. It marks safety, warmth, and a place to return.",
         "Use two wood, one stone, and one herb.",
+        "The flame is the first promise: leave, risk something, come back changed.",
       ]);
       break;
     case "firstCampReady":
       requestDialogue(state, "Edda", [
         "The first lesson is done.",
         "From here the valley opens slowly: better tools, safer paths, and stories worth following.",
+        "There are high stones east, wet reeds west, and colder trees beyond the morning trail.",
+        "You do not need to clear everything. You need to understand what each place is asking from you.",
+        "When you are ready, follow the lower trail and choose the angle before the guardian chooses it for you.",
       ]);
       break;
   }
