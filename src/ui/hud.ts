@@ -165,6 +165,8 @@ function stageRank(stage: TutorialStage): number {
     "clearGuardian",
     "returnGuardian",
     "firstCampReady",
+    "openTrailCache",
+    "chooseNextTrail",
   ];
   return order.indexOf(stage);
 }
@@ -203,6 +205,8 @@ function chapterLabel(stage: TutorialStage): string {
     case "returnGuardian":
       return "First Guardian";
     case "firstCampReady":
+    case "openTrailCache":
+    case "chooseNextTrail":
       return "Trail Opens";
   }
 }

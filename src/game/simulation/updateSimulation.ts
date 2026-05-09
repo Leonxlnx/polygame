@@ -297,6 +297,21 @@ function useResourceNode(state: GameState, node: ResourceNode): void {
   }
 
   if (node.resource === "lore") {
+    if (state.quest.tutorialStage === "firstCampReady" && node.kind === "marker" && node.z > 20) {
+      state.quest.tutorialStage = "openTrailCache";
+      node.active = false;
+      pushHarvestEvent(state, node);
+      cueChapter(state, "Chapter 2", "Old Trail Sign");
+      showMessage(state, "The old marker points to a trail cache.");
+      requestDialogue(state, "Trail Marker", [
+        "Three notches face away from the morning camp.",
+        "East: stone rise. West: reed water. North: cold pine.",
+        "A small cache is buried beside this marker for travelers who reached it with their feet, not just their eyes.",
+        "Open it, then choose which horizon should become the next problem.",
+      ]);
+      return;
+    }
+
     showMessage(state, "Old trail note: the valley starts slowly, one useful task at a time.");
     node.active = false;
     pushHarvestEvent(state, node);
@@ -448,6 +463,20 @@ function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
       showMessage(state, "Herbs ready. Return to Edda.");
       return;
     }
+  }
+
+  if (node.resource === "coin" && node.kind === "chest" && state.quest.tutorialStage === "openTrailCache") {
+    state.quest.tutorialStage = "chooseNextTrail";
+    cueChapter(state, "Choice Opens", "Three Trails");
+    showMessage(state, "Trail cache opened. The next routes are marked.");
+    requestDialogue(state, "Trail Cache", [
+      "Inside: a few coins, a folded map scrap, and three carved route marks.",
+      "The east mark is heavy with stone dust.",
+      "The west mark smells of wet reeds.",
+      "The north mark carries pine resin and cold air.",
+      "This is the shape of the next demo slice: one camp behind you, three readable directions ahead.",
+    ]);
+    return;
   }
 
   const label = node.resource === "coin" ? "coins" : node.resource;
@@ -841,7 +870,13 @@ export function updateQuest(state: GameState): void {
       state.quest.currentObjective = "Return to Edda after the fight.";
       break;
     case "firstCampReady":
-      state.quest.currentObjective = "Follow the lower trail when ready.";
+      state.quest.currentObjective = "Follow the lower trail and inspect the old marker.";
+      break;
+    case "openTrailCache":
+      state.quest.currentObjective = "Open the trail cache beside the marker.";
+      break;
+    case "chooseNextTrail":
+      state.quest.currentObjective = "Choose a future route: east stone, west reeds, or north pine.";
       break;
   }
 }
@@ -1017,7 +1052,22 @@ function talkToGuide(state: GameState): void {
         "From here the valley opens slowly: better tools, safer paths, and stories worth following.",
         "There are high stones east, wet reeds west, and colder trees beyond the morning trail.",
         "You do not need to clear everything. You need to understand what each place is asking from you.",
-        "When you are ready, follow the lower trail and choose the angle before the guardian chooses it for you.",
+        "When you are ready, follow the lower trail to the old marker. It will point to the next useful choice.",
+      ]);
+      break;
+    case "openTrailCache":
+      requestDialogue(state, "Edda", [
+        "The marker is old, but the cache should still be close.",
+        "Open it before picking a direction. A good route begins with information, not speed.",
+      ]);
+      break;
+    case "chooseNextTrail":
+      requestDialogue(state, "Edda", [
+        "Now we have the shape of the valley.",
+        "East should teach climbing, mining, and old stone mechanisms.",
+        "West should teach water, reeds, fishing, and soft ground.",
+        "North should teach colder forest, better timber, and longer survival loops.",
+        "The next build should choose one of those routes and make it deep instead of throwing all three at you at once.",
       ]);
       break;
   }
@@ -1097,7 +1147,15 @@ function activeChecklist(state: GameState, woodCount: string, stoneCount: string
     case "returnGuardian":
       return [{ label: "Report back", complete: false }];
     case "firstCampReady":
-      return [{ label: "Trail unlocked", complete: true }];
+      return [{ label: "Find old marker", complete: false }];
+    case "openTrailCache":
+      return [{ label: "Open trail cache", complete: false }];
+    case "chooseNextTrail":
+      return [
+        { label: "East stone rise", complete: false },
+        { label: "West reedfen", complete: false },
+        { label: "North pinewood", complete: false },
+      ];
   }
 }
 

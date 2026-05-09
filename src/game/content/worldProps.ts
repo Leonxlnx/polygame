@@ -305,6 +305,7 @@ function addBiomeLandmarks(props: WorldProp[]): void {
     { kind: "willow" as const, x: -104, z: 104, scale: 1.16, rotation: 0.6 },
     { kind: "crystal" as const, x: 118, z: 118, scale: 1.2, rotation: 0.1 },
     { kind: "marker" as const, x: -42, z: 34, scale: 0.86, rotation: -0.25 },
+    { kind: "chest" as const, x: -39.4, z: 35.6, scale: 0.82, rotation: 0.45 },
   ].forEach((prop, index) => {
     props.push({
       kind: prop.kind,

@@ -27,7 +27,9 @@ export type TutorialStage =
   | "repairBridge"
   | "clearGuardian"
   | "returnGuardian"
-  | "firstCampReady";
+  | "firstCampReady"
+  | "openTrailCache"
+  | "chooseNextTrail";
 
 export const GUIDE_NPC_POSITION = { x: -6.35, z: -0.55 } as const;
 const START_SPAWN_Z = OPENING_PATH_START_Z + 1.15;
