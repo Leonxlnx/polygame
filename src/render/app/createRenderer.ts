@@ -8,7 +8,7 @@ export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
     powerPreference: "high-performance",
   });
 
-  renderer.setClearColor("#142019");
+  renderer.setClearColor("#668548");
   renderer.setPixelRatio(Math.min(window.devicePixelRatio * 1.2, 2.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;

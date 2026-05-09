@@ -237,6 +237,8 @@ export class GameApp {
     window.addEventListener("pointermove", this.handlePointerMove);
     window.addEventListener("pointerup", this.handlePointerUp);
     window.addEventListener("keydown", this.handleMenuKeyDown);
+    window.addEventListener("resize", this.handleResize);
+    window.visualViewport?.addEventListener("resize", this.handleResize);
     options.canvas.addEventListener("webglcontextlost", this.handleContextLost);
   }
 
@@ -277,6 +279,8 @@ export class GameApp {
     window.removeEventListener("pointermove", this.handlePointerMove);
     window.removeEventListener("pointerup", this.handlePointerUp);
     window.removeEventListener("keydown", this.handleMenuKeyDown);
+    window.removeEventListener("resize", this.handleResize);
+    window.visualViewport?.removeEventListener("resize", this.handleResize);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.handleContextLost);
     this.renderer.dispose();
   }
@@ -1051,9 +1055,24 @@ export class GameApp {
 
   private readonly handleResize = (): void => {
     const canvas = this.renderer.domElement;
-    const width = Math.max(1, canvas.clientWidth);
-    const height = Math.max(1, canvas.clientHeight);
+    const viewport = window.visualViewport;
+    const width = Math.max(
+      1,
+      Math.round(viewport?.width ?? 0),
+      Math.round(window.innerWidth),
+      Math.round(document.documentElement.clientWidth),
+      Math.round(canvas.clientWidth),
+    );
+    const height = Math.max(
+      1,
+      Math.round(viewport?.height ?? 0),
+      Math.round(window.innerHeight),
+      Math.round(document.documentElement.clientHeight),
+      Math.round(canvas.clientHeight),
+    );
 
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     resizeCamera(this.camera, width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio * 1.2, 2.5));
     this.renderer.setSize(width, height, false);
