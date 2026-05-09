@@ -185,9 +185,7 @@ function updateOpeningWalk(state: GameState): void {
 
   state.quest.tutorialStage = "walkToGuide";
   showMessage(state, "A ridge camp sits ahead.");
-  state.action.chapterCueTitle = "";
-  state.action.chapterCueText = "";
-  state.action.chapterCueTimer = 0;
+  cueChapter(state, "First Trail", "Find Edda");
 }
 
 function performAttack(state: GameState): void {
@@ -241,6 +239,7 @@ function performAttack(state: GameState): void {
     state.quest.enemyDefeated = true;
     if (state.quest.tutorialStage === "clearGuardian") {
       state.quest.tutorialStage = "returnGuardian";
+      cueChapter(state, "Guardian Down", "Return to Camp");
       showMessage(state, "Guardian defeated. Return to Edda.");
     } else {
       showMessage(state, "Guardian defeated. You recovered 3 coins.");
@@ -351,6 +350,7 @@ function craftPickaxe(state: GameState): void {
   state.quest.pickaxeCrafted = true;
   state.quest.toolLevel = Math.max(state.quest.toolLevel, 1);
   state.quest.tutorialStage = "mineStone";
+  cueChapter(state, "Tool Made", "Wooden Pick");
   showMessage(state, "Wooden pick crafted.");
   requestDialogue(state, "Edda", [
     "Good. Now the small grey stones along the bend will give way.",
@@ -377,6 +377,7 @@ function craftAxe(state: GameState): void {
   state.quest.axeCrafted = true;
   state.quest.toolLevel = Math.max(state.quest.toolLevel, 2);
   state.quest.tutorialStage = "fellTree";
+  cueChapter(state, "Tool Made", "Camp Axe");
   showMessage(state, "Camp axe crafted.");
   requestDialogue(state, "Edda", [
     "Now the living trees are no longer just walls.",
@@ -399,12 +400,26 @@ function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
 
   node.active = false;
   if (!isResourceKind(node.resource)) return;
+
+  if (isTreeNode(node)) {
+    spawnFelledLog(state, node);
+    if (state.quest.tutorialStage === "fellTree") {
+      state.quest.treeChopped = true;
+      cueChapter(state, "Tree Felled", "Collect the Timber");
+      showMessage(state, "Tree down. Pick up the cut wood.");
+      return;
+    }
+    showMessage(state, "Tree down. Cut wood is ready.");
+    return;
+  }
+
   state.resources[node.resource] += node.amount;
 
-  if (isTreeNode(node) && state.quest.tutorialStage === "fellTree") {
-    state.quest.treeChopped = true;
+  if (isFelledLogNode(node) && state.quest.tutorialStage === "fellTree" && state.quest.treeChopped) {
+    state.world.buildings = state.world.buildings.filter((building) => building.id !== droppedLogBuildingId(node.id));
     state.quest.tutorialStage = "returnTree";
-    showMessage(state, "Tree felled. Return to Edda.");
+    cueChapter(state, "Timber Ready", "Return to Edda");
+    showMessage(state, "Cut wood packed. Return to Edda.");
     return;
   }
 
@@ -441,6 +456,42 @@ function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
 
 function isTreeNode(node: ResourceNode): boolean {
   return node.kind === "pine" || node.kind === "oak" || node.kind === "birch" || node.kind === "willow";
+}
+
+function isFelledLogNode(node: ResourceNode): boolean {
+  return node.kind === "log" && node.id.endsWith("-fallen-log");
+}
+
+function spawnFelledLog(state: GameState, node: ResourceNode): void {
+  const dropId = `${node.id}-fallen-log`;
+  if (state.world.resourceNodes.some((item) => item.id === dropId)) return;
+
+  const fallYaw = Math.atan2(state.player.position.x - node.x, state.player.position.z - node.z) + Math.PI * 0.5;
+  const dropX = node.x + Math.sin(fallYaw) * 0.72;
+  const dropZ = node.z + Math.cos(fallYaw) * 0.72;
+  state.world.resourceNodes.push({
+    id: dropId,
+    kind: "log",
+    x: dropX,
+    z: dropZ,
+    radius: 1.15,
+    active: true,
+    resource: "wood",
+    amount: node.amount,
+    actionLabel: "Pick up cut wood",
+    hitsRemaining: 1,
+    maxHits: 1,
+  });
+  state.world.buildings.push({
+    id: droppedLogBuildingId(dropId),
+    kind: "felledLog",
+    position: state.player.position.clone().set(dropX, 0, dropZ),
+    rotation: fallYaw,
+  });
+}
+
+function droppedLogBuildingId(nodeId: string): string {
+  return `drop-${nodeId}`;
 }
 
 function isResourceKind(resource: ResourceNode["resource"]): resource is keyof GameState["resources"] {
@@ -536,6 +587,7 @@ function buildCampStructure(state: GameState): void {
   state.quest.cabinBuilt = true;
   state.quest.campLevel = Math.max(state.quest.campLevel, 1);
   state.quest.tutorialStage = "practiceSwing";
+  cueChapter(state, "Camp Grows", "First Shelter");
   showMessage(state, "Shelter placed.");
   requestDialogue(state, "Edda", [
     "That gives the camp a center. Not a city yet. Just a place the valley can remember.",
@@ -572,6 +624,7 @@ function buildCampfire(state: GameState): void {
   state.quest.campLevel = Math.max(state.quest.campLevel, 2);
   state.quest.tutorialStage = "craftAxe";
   state.quest.combatUnlocked = false;
+  cueChapter(state, "Camp Grows", "First Fire");
   showMessage(state, "Campfire lit. Edda has the next tool plan.");
   requestDialogue(state, "Edda", [
     "Now the camp has smoke, shelter, tools, and a reason to return.",
@@ -606,6 +659,7 @@ function repairTrailBridge(state: GameState): void {
   state.quest.campLevel = Math.max(state.quest.campLevel, 3);
   state.quest.tutorialStage = "clearGuardian";
   state.quest.combatUnlocked = true;
+  cueChapter(state, "Lower Trail", "Crossing Repaired");
   showMessage(state, "Crossing repaired. The guardian hears you.");
   requestDialogue(state, "Edda", [
     "Good. That repair matters because it gives you a way back.",
@@ -947,6 +1001,7 @@ function talkToGuide(state: GameState): void {
       break;
     case "returnGuardian":
       state.quest.tutorialStage = "firstCampReady";
+      cueChapter(state, "Chapter Complete", "Trail Opens");
       requestDialogue(state, "Edda", [
         "You came back. That matters more than the coins.",
         "Now the camp has a loop: gather, craft, build, fight, return, improve.",
@@ -978,31 +1033,67 @@ function activeChecklist(state: GameState, woodCount: string, stoneCount: string
       return [{ label: "Listen", complete: false }];
     case "gatherWood":
     case "returnWood":
-      return [{ label: state.quest.woodDelivered ? "Wood delivered" : `Wood ${woodCount}`, complete: state.quest.woodDelivered }];
+      return [
+        { label: `Wood ${woodCount}`, complete: state.quest.woodGathered || state.quest.woodDelivered },
+        { label: "Return to Edda", complete: state.quest.woodDelivered },
+      ];
     case "craftPickaxe":
-      return [{ label: state.quest.pickaxeCrafted ? "Wooden pick made" : "Craft wooden pick", complete: state.quest.pickaxeCrafted }];
+      return [
+        { label: `${Math.min(state.resources.wood, 3)} / 3 wood`, complete: state.resources.wood >= 3 || state.quest.pickaxeCrafted },
+        { label: "Use workbench", complete: state.quest.pickaxeCrafted },
+      ];
     case "mineStone":
     case "returnStone":
-      return [{ label: state.quest.stoneDelivered ? "Stone delivered" : `Stone ${stoneCount}`, complete: state.quest.stoneDelivered }];
+      return [
+        { label: `Stone ${stoneCount}`, complete: state.quest.stoneGathered || state.quest.stoneDelivered },
+        { label: "Return to Edda", complete: state.quest.stoneDelivered },
+      ];
     case "buildShelter":
-      return [{ label: state.quest.cabinBuilt ? "Shelter placed" : "Build shelter", complete: state.quest.cabinBuilt }];
+      return [
+        { label: `${Math.min(state.resources.wood, 2)} / 2 wood`, complete: state.resources.wood >= 2 || state.quest.cabinBuilt },
+        { label: `${Math.min(state.resources.stone, 1)} / 1 stone`, complete: state.resources.stone >= 1 || state.quest.cabinBuilt },
+        { label: "Place shelter", complete: state.quest.cabinBuilt },
+      ];
     case "practiceSwing":
       return [{ label: state.quest.attackPracticed ? "Swing practiced" : "Practice swing", complete: state.quest.attackPracticed }];
     case "gatherHerbs":
     case "returnHerbs":
-      return [{ label: state.quest.herbsDelivered ? "Herbs checked" : `Herbs ${herbCount}`, complete: state.quest.herbsDelivered }];
+      return [
+        { label: `Herbs ${herbCount}`, complete: state.quest.herbsGathered || state.quest.herbsDelivered },
+        { label: "Return to Edda", complete: state.quest.herbsDelivered },
+      ];
     case "buildCampfire":
-      return [{ label: state.quest.campfireBuilt ? "Campfire lit" : "Build campfire", complete: state.quest.campfireBuilt }];
+      return [
+        { label: `${Math.min(state.resources.wood, 2)} / 2 wood`, complete: state.resources.wood >= 2 || state.quest.campfireBuilt },
+        { label: `${Math.min(state.resources.stone, 1)} / 1 stone`, complete: state.resources.stone >= 1 || state.quest.campfireBuilt },
+        { label: `${Math.min(state.resources.herb, 1)} / 1 herb`, complete: state.resources.herb >= 1 || state.quest.campfireBuilt },
+      ];
     case "craftAxe":
-      return [{ label: state.quest.axeCrafted ? "Axe crafted" : "Craft camp axe", complete: state.quest.axeCrafted }];
+      return [
+        { label: `${Math.min(state.resources.wood, 4)} / 4 wood`, complete: state.resources.wood >= 4 || state.quest.axeCrafted },
+        { label: `${Math.min(state.resources.stone, 1)} / 1 stone`, complete: state.resources.stone >= 1 || state.quest.axeCrafted },
+        { label: "Use workbench", complete: state.quest.axeCrafted },
+      ];
     case "fellTree":
-      return [{ label: state.quest.treeChopped ? "Tree felled" : "Fell one tree", complete: state.quest.treeChopped }];
+      return state.quest.treeChopped
+        ? [
+            { label: "Tree felled", complete: true },
+            { label: "Pick up cut wood", complete: false },
+          ]
+        : [{ label: "Fell one tree", complete: false }];
     case "returnTree":
       return [{ label: "Return with timber", complete: false }];
     case "repairBridge":
-      return [{ label: state.quest.bridgeRepaired ? "Crossing repaired" : "Repair crossing", complete: state.quest.bridgeRepaired }];
+      return [
+        { label: `${Math.min(state.resources.wood, 4)} / 4 wood`, complete: state.resources.wood >= 4 || state.quest.bridgeRepaired },
+        { label: `${Math.min(state.resources.stone, 2)} / 2 stone`, complete: state.resources.stone >= 2 || state.quest.bridgeRepaired },
+        { label: "Repair crossing", complete: state.quest.bridgeRepaired },
+      ];
     case "clearGuardian":
-      return [{ label: state.quest.enemyDefeated ? "Guardian defeated" : "Defeat guardian", complete: state.quest.enemyDefeated }];
+      return [
+        { label: "Draw sword", complete: state.quest.attackPracticed },
+        { label: "Defeat guardian", complete: state.quest.enemyDefeated },
+      ];
     case "returnGuardian":
       return [{ label: "Report back", complete: false }];
     case "firstCampReady":
@@ -1025,6 +1116,12 @@ function updateBiomeContext(state: GameState): void {
 function showMessage(state: GameState, message: string): void {
   state.action.message = message;
   state.action.messageTimer = 4.2;
+}
+
+function cueChapter(state: GameState, title: string, text: string, duration = 2.9): void {
+  state.action.chapterCueTitle = title;
+  state.action.chapterCueText = text;
+  state.action.chapterCueTimer = duration;
 }
 
 function resolveWorldCollisions(state: GameState): void {

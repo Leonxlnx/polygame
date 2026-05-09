@@ -82,7 +82,7 @@ export type EnemyState = {
 
 export type BuildingState = {
   id: string;
-  kind: "cabin" | "campfire" | "bridge";
+  kind: "cabin" | "campfire" | "bridge" | "felledLog";
   position: THREE.Vector3;
   rotation: number;
 };

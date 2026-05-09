@@ -815,6 +815,14 @@ export class GameApp {
   }
 
   private syncBuildings(): void {
+    const activeBuildingIds = new Set(this.state.world.buildings.map((building) => building.id));
+    this.buildingViews.forEach((view, id) => {
+      if (activeBuildingIds.has(id)) return;
+      this.buildingRoot.remove(view);
+      disposeObjectTree(view);
+      this.buildingViews.delete(id);
+    });
+
     this.state.world.buildings.forEach((building) => {
       let view = this.buildingViews.get(building.id);
       if (!view) {
@@ -1433,6 +1441,7 @@ function enemyStyle(enemy: EnemyState): {
 function createBuildingView(building: BuildingState): THREE.Group {
   if (building.kind === "campfire") return createCampfireView(building);
   if (building.kind === "bridge") return createBridgeView(building);
+  if (building.kind === "felledLog") return createFelledLogView(building);
   return createCabinView(building);
 }
 
@@ -1557,6 +1566,48 @@ function createBridgeView(building: BuildingState): THREE.Group {
       group.add(peg);
     });
   });
+
+  return group;
+}
+
+function createFelledLogView(building: BuildingState): THREE.Group {
+  const group = new THREE.Group();
+  group.name = building.id;
+  group.position.set(building.position.x, terrainHeight(building.position.x, building.position.z) + 0.11, building.position.z);
+  group.rotation.y = building.rotation;
+
+  const barkMaterial = new THREE.MeshStandardMaterial({ color: "#6a4328", roughness: 0.96, flatShading: true });
+  const cutMaterial = new THREE.MeshStandardMaterial({ color: "#d0aa66", roughness: 0.92, flatShading: true });
+  const shadowMaterial = new THREE.MeshBasicMaterial({ color: "#1f2618", transparent: true, opacity: 0.22, depthWrite: false });
+
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.82, 14), shadowMaterial);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -0.105;
+  group.add(shadow);
+
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 1.48, 7), barkMaterial);
+  trunk.rotation.z = Math.PI / 2;
+  trunk.rotation.y = 0.06;
+  trunk.castShadow = true;
+  trunk.receiveShadow = true;
+  group.add(trunk);
+
+  [-0.78, 0.78].forEach((x, index) => {
+    const end = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.035, 7), cutMaterial);
+    end.rotation.z = Math.PI / 2;
+    end.position.x = x;
+    end.scale.setScalar(index === 0 ? 0.94 : 1.04);
+    end.castShadow = true;
+    group.add(end);
+  });
+
+  for (let strip = 0; strip < 3; strip += 1) {
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(1.2 - strip * 0.18, 0.035, 0.035), barkMaterial);
+    ridge.position.set(0.02 * strip, 0.1 - strip * 0.075, 0.17 + strip * 0.018);
+    ridge.rotation.z = 0.02 * (strip - 1);
+    ridge.castShadow = true;
+    group.add(ridge);
+  }
 
   return group;
 }

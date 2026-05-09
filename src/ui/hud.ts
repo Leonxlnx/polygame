@@ -55,7 +55,9 @@ export function createHud(root: HTMLElement): Hud {
       objectiveValue.textContent = state.quest.currentObjective;
       chapterValue.textContent = chapterLabel(state.quest.tutorialStage);
       campValue.textContent = String(state.quest.campLevel);
-      questList.replaceChildren(...state.quest.checklist.filter((item) => !item.complete).slice(0, 1).map(createQuestItem));
+      const activeQuestItems = state.quest.checklist.filter((item) => !item.complete).slice(0, 3);
+      const visibleQuestItems = activeQuestItems.length > 0 ? activeQuestItems : state.quest.checklist.slice(-1);
+      questList.replaceChildren(...visibleQuestItems.map(createQuestItem));
       inventorySummary.replaceChildren(...createInventorySummary(state));
       inventoryPanel.classList.toggle("is-hidden", !state.ui.inventoryOpen);
       const campVisible = state.quest.campLevel > 0 || isAtLeast(state.quest.tutorialStage, "buildShelter");
