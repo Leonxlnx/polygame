@@ -235,8 +235,10 @@ function performAttack(state: GameState): void {
 
   if (enemy.health <= 0) {
     enemy.defeated = true;
-    state.resources.coin += 3;
+    const coinReward = 3;
+    state.resources.coin += coinReward;
     state.quest.enemyDefeated = true;
+    pushEnemyRewardEvent(state, enemy, coinReward);
     if (state.quest.tutorialStage === "clearGuardian") {
       state.quest.tutorialStage = "returnGuardian";
       cueChapter(state, "Guardian Down", "Return to Camp");
@@ -247,6 +249,21 @@ function performAttack(state: GameState): void {
   } else {
     showMessage(state, "Hit landed.");
   }
+}
+
+function pushEnemyRewardEvent(state: GameState, enemy: EnemyState, amount: number): void {
+  state.action.harvestEvents.push({
+    id: state.action.harvestEvents.length + 1,
+    nodeId: `reward-${enemy.id}`,
+    kind: "chest",
+    resource: "coin",
+    x: enemy.position.x,
+    z: enemy.position.z,
+    final: true,
+    hitIndex: 1,
+    totalHits: 1,
+    amount,
+  });
 }
 
 function updateTimedHarvest(state: GameState): void {
