@@ -2,12 +2,21 @@ import * as THREE from "three";
 
 export type PlayerCharacter = {
   root: THREE.Group;
-  update: (deltaSeconds: number, velocity: THREE.Vector3, elapsedSeconds: number, attackPulse?: number, gatherPulse?: number, talkAmount?: number) => void;
+  update: (
+    deltaSeconds: number,
+    velocity: THREE.Vector3,
+    elapsedSeconds: number,
+    attackPulse?: number,
+    gatherPulse?: number,
+    talkAmount?: number,
+    equipment?: CharacterEquipment,
+  ) => void;
   dispose: () => void;
 };
 
 export type CharacterStyleId = "pathfinder" | "sentinel" | "arcanist" | "warden" | "duelist";
 export type CharacterColorId = "forest" | "steel" | "ember" | "violet" | "ochre";
+export type CharacterEquipment = "hands" | "pick" | "axe" | "sword" | "build";
 
 type CharacterColors = {
   tunic: string;
@@ -58,6 +67,7 @@ type CharacterRig = {
   head: THREE.Group;
   arms: Record<LimbSide, ArmRig>;
   legs: Record<LimbSide, LegRig>;
+  equipment: Record<Exclude<CharacterEquipment, "hands">, THREE.Group>;
 };
 
 type CharacterSilhouette = {
@@ -94,6 +104,12 @@ type GeometrySet = {
   shin: THREE.BufferGeometry;
   foot: THREE.BufferGeometry;
   gem: THREE.BufferGeometry;
+  toolHandle: THREE.BufferGeometry;
+  pickHead: THREE.BufferGeometry;
+  axeHead: THREE.BufferGeometry;
+  hammerHead: THREE.BufferGeometry;
+  swordBlade: THREE.BufferGeometry;
+  swordGuard: THREE.BufferGeometry;
 };
 
 type MaterialSet = {
@@ -106,7 +122,25 @@ type MaterialSet = {
   skin: THREE.MeshStandardMaterial;
   hair: THREE.MeshStandardMaterial;
   eye: THREE.MeshStandardMaterial;
+  metal: THREE.MeshStandardMaterial;
+  blade: THREE.MeshStandardMaterial;
 };
+
+type AnimationCue = {
+  headYaw: number;
+  shoulderLift: number;
+  wristTurn: number;
+  breath: number;
+  talkHand: number;
+};
+
+const ANIMATION_CUES: AnimationCue[] = Array.from({ length: 100 }, (_, index) => ({
+  headYaw: Math.sin(index * 1.73) * 0.018,
+  shoulderLift: Math.cos(index * 1.19) * 0.012,
+  wristTurn: Math.sin(index * 2.07 + 0.4) * 0.026,
+  breath: 0.88 + Math.sin(index * 0.83) * 0.12,
+  talkHand: Math.cos(index * 1.41 + 0.8) * 0.038,
+}));
 
 export const characterColorVariants: CharacterColorVariant[] = [
   {
@@ -234,7 +268,7 @@ export function createPlayerCharacter(
 
   return {
     root,
-    update: (deltaSeconds, velocity, elapsedSeconds, attackPulse = 0, gatherPulse = 0, talkAmount = 0) => {
+    update: (deltaSeconds, velocity, elapsedSeconds, attackPulse = 0, gatherPulse = 0, talkAmount = 0, equipment = "hands") => {
       const speed = Math.hypot(velocity.x, velocity.z);
       const targetWalkBlend = THREE.MathUtils.clamp(speed / 4.2, 0, 1);
       const targetRunBlend = THREE.MathUtils.clamp((speed - 4.25) / 2.1, 0, 1);
@@ -277,11 +311,14 @@ export function createPlayerCharacter(
       const talk = smoothStep(talkAmount);
       const talkBeat = Math.sin(elapsedSeconds * 8.4) * talk;
       const talkGesture = Math.sin(elapsedSeconds * 3.2 + 0.4) * talk;
+      const cue = ANIMATION_CUES[Math.floor((elapsedSeconds * 0.42 + preset.scale * 17) % ANIMATION_CUES.length)];
+      const calmCue = (1 - walkEase) * (1 - attackSwing) * (1 - gatherSwing);
       const forwardLean = (0.014 + speed * 0.0025 + runEase * 0.018) * walkEase;
       const torsoLean = (0.01 + speed * 0.0018 + runEase * 0.012) * walkEase;
 
+      syncEquipment(rig.equipment, equipment);
       rig.facing.rotation.y = facingYaw;
-      rig.facing.position.y = 0.11 + groundedBob + idleBreath * 0.008 - gatherStrike * 0.01;
+      rig.facing.position.y = 0.11 + groundedBob + idleBreath * 0.008 * cue.breath - gatherStrike * 0.01;
       rig.torso.position.y = 0.21 + idleBreath * 0.006 - contactPulse * 0.006 * walkEase - gatherStrike * 0.012;
       rig.hips.rotation.x = forwardLean + movementLean.y + Math.sin(walkPhase * 2) * 0.006 * walkEase + gatherStrike * 0.08 - gatherRecover * 0.035;
       rig.hips.rotation.y = attackSwing * 0.16 + gatherWindup * 0.08 - gatherStrike * 0.1;
@@ -291,7 +328,7 @@ export function createPlayerCharacter(
       rig.torso.rotation.z = -Math.sin(walkPhase) * (0.008 + runEase * 0.004) * walkEase;
       rig.chest.rotation.y = Math.sin(walkPhase) * (0.02 + runEase * 0.016) * walkEase + attackSwing * 0.34;
       rig.head.rotation.x = idleBreath * 0.012 - forwardLean * 0.12 + strideAbs * 0.003 * walkEase + gatherStrike * 0.06 + talkBeat * 0.018;
-      rig.head.rotation.y = -Math.sin(walkPhase) * 0.012 * walkEase - attackSwing * 0.12 - gatherStrike * 0.04 + talkGesture * 0.025;
+      rig.head.rotation.y = -Math.sin(walkPhase) * 0.012 * walkEase - attackSwing * 0.12 - gatherStrike * 0.04 + talkGesture * 0.025 + cue.headYaw * calmCue;
       rig.head.rotation.z = Math.sin(elapsedSeconds * 1.35) * 0.012 * (1 - walkBlend) + talkGesture * 0.014;
 
       animateLeg(rig.legs.left, leftPhase, walkBlend, runBlend);
@@ -299,13 +336,20 @@ export function createPlayerCharacter(
       animateArm(rig.arms.left, rightPhase, walkBlend, runBlend, -1);
       animateArm(rig.arms.right, leftPhase, walkBlend, runBlend, 1);
 
+      rig.arms.left.shoulder.rotation.y += cue.shoulderLift * calmCue;
+      rig.arms.right.shoulder.rotation.y -= cue.shoulderLift * calmCue;
+      rig.arms.left.hand.rotation.y += cue.wristTurn * calmCue;
+      rig.arms.right.hand.rotation.y -= cue.wristTurn * calmCue;
+
       if (attackPulse > 0) {
-        rig.arms.right.shoulder.rotation.x -= 0.9 * attackSwing + 0.18 * attackFollow;
-        rig.arms.right.shoulder.rotation.z += 0.32 * attackSwing;
-        rig.arms.right.elbow.rotation.x -= 0.5 * attackSwing;
-        rig.arms.right.hand.rotation.z += 0.26 * attackSwing;
+        rig.arms.right.shoulder.rotation.x -= 1.08 * attackSwing + 0.22 * attackFollow;
+        rig.arms.right.shoulder.rotation.z += 0.4 * attackSwing;
+        rig.arms.right.elbow.rotation.x -= 0.58 * attackSwing;
+        rig.arms.right.hand.rotation.z += 0.42 * attackSwing;
+        rig.arms.right.hand.rotation.x -= 0.2 * attackSwing;
         rig.arms.left.shoulder.rotation.x += 0.28 * attackSwing;
         rig.arms.left.elbow.rotation.x -= 0.18 * attackSwing;
+        rig.equipment.sword.rotation.z = -0.34 + attackSwing * 0.68;
       }
 
       if (gatherPulse > 0) {
@@ -328,12 +372,15 @@ export function createPlayerCharacter(
         rig.arms.right.hand.rotation.x += 0.16 * gatherStrike;
         rig.arms.left.hand.rotation.z -= 0.12 * gatherWindup + 0.18 * gatherStrike;
         rig.arms.right.hand.rotation.z += 0.12 * gatherWindup + 0.2 * gatherStrike;
+        rig.equipment.pick.rotation.x = -0.22 - gatherStrike * 0.44;
+        rig.equipment.axe.rotation.x = -0.18 - gatherStrike * 0.58;
+        rig.equipment.build.rotation.z = 0.1 + gatherStrike * 0.28;
       }
 
       if (talk > 0) {
         rig.chest.rotation.y += talkGesture * 0.035;
-        rig.arms.left.shoulder.rotation.x += talkGesture * 0.045;
-        rig.arms.right.shoulder.rotation.x -= talkGesture * 0.05;
+        rig.arms.left.shoulder.rotation.x += talkGesture * 0.045 + cue.talkHand * 0.45;
+        rig.arms.right.shoulder.rotation.x -= talkGesture * 0.05 - cue.talkHand * 0.35;
         rig.arms.left.elbow.rotation.x -= (0.05 + Math.max(0, talkBeat) * 0.035) * talk;
         rig.arms.right.elbow.rotation.x -= (0.05 + Math.max(0, -talkBeat) * 0.035) * talk;
         rig.arms.left.hand.rotation.z -= talkGesture * 0.04;
@@ -430,6 +477,7 @@ function createRig(
     right: createArm("right", geometries, materials, silhouette),
   };
   torso.add(arms.left.shoulder, arms.right.shoulder);
+  const equipment = createEquipment(arms.right.hand, geometries, materials);
 
   const legs = {
     left: createLeg("left", geometries, materials, silhouette),
@@ -437,7 +485,7 @@ function createRig(
   };
   hips.add(legs.left.hip, legs.right.hip);
 
-  return { facing, hips, torso, chest, head, arms, legs };
+  return { facing, hips, torso, chest, head, arms, legs, equipment };
 }
 
 function createGeometries(): GeometrySet {
@@ -461,6 +509,12 @@ function createGeometries(): GeometrySet {
     shin: new THREE.CylinderGeometry(0.058, 0.074, 0.38, 8),
     foot: new THREE.DodecahedronGeometry(0.105, 0),
     gem: new THREE.DodecahedronGeometry(0.07, 0),
+    toolHandle: new THREE.BoxGeometry(0.055, 0.62, 0.055),
+    pickHead: new THREE.BoxGeometry(0.48, 0.07, 0.08),
+    axeHead: new THREE.BoxGeometry(0.24, 0.34, 0.07),
+    hammerHead: new THREE.BoxGeometry(0.34, 0.18, 0.16),
+    swordBlade: new THREE.BoxGeometry(0.07, 0.78, 0.035),
+    swordGuard: new THREE.BoxGeometry(0.32, 0.055, 0.075),
   };
 }
 
@@ -475,7 +529,68 @@ function createMaterials(colors: CharacterColors): MaterialSet {
     skin: material(colors.skin),
     hair: material(colors.hair),
     eye: new THREE.MeshStandardMaterial({ color: "#1b1a15", roughness: 0.8, flatShading: true }),
+    metal: new THREE.MeshStandardMaterial({ color: "#8c8f86", roughness: 0.56, metalness: 0.16, flatShading: true }),
+    blade: new THREE.MeshStandardMaterial({ color: "#c6c9bd", roughness: 0.46, metalness: 0.22, flatShading: true }),
   };
+}
+
+function createEquipment(
+  rightHand: THREE.Group,
+  geometries: GeometrySet,
+  materials: MaterialSet,
+): Record<Exclude<CharacterEquipment, "hands">, THREE.Group> {
+  const sword = new THREE.Group();
+  sword.name = "EquippedSword";
+  sword.position.set(0.018, -0.11, 0.055);
+  sword.rotation.set(0.18, 0, -0.34);
+  const blade = mesh(geometries.swordBlade, materials.blade, "SwordBlade");
+  blade.position.y = -0.47;
+  const guard = mesh(geometries.swordGuard, materials.metal, "SwordGuard");
+  guard.position.y = -0.08;
+  const grip = mesh(geometries.toolHandle, materials.leather, "SwordGrip");
+  grip.position.y = 0.12;
+  grip.scale.set(0.82, 0.38, 0.82);
+  sword.add(blade, guard, grip);
+
+  const pick = new THREE.Group();
+  pick.name = "EquippedPick";
+  pick.position.set(0.012, -0.2, 0.052);
+  pick.rotation.set(-0.22, 0, 0.08);
+  const pickHandle = mesh(geometries.toolHandle, materials.leather, "PickHandle");
+  pickHandle.position.y = -0.16;
+  const pickHead = mesh(geometries.pickHead, materials.metal, "PickHead");
+  pickHead.position.y = 0.18;
+  pick.add(pickHandle, pickHead);
+
+  const axe = new THREE.Group();
+  axe.name = "EquippedAxe";
+  axe.position.set(0.012, -0.19, 0.056);
+  axe.rotation.set(-0.18, 0, 0.06);
+  const axeHandle = mesh(geometries.toolHandle, materials.leather, "AxeHandle");
+  axeHandle.position.y = -0.14;
+  const axeHead = mesh(geometries.axeHead, materials.metal, "AxeHead");
+  axeHead.position.set(0.12, 0.18, 0);
+  axe.add(axeHandle, axeHead);
+
+  const build = new THREE.Group();
+  build.name = "EquippedBuildTool";
+  build.position.set(0.014, -0.2, 0.05);
+  build.rotation.set(-0.08, 0, 0.1);
+  const hammerHandle = mesh(geometries.toolHandle, materials.leather, "HammerHandle");
+  hammerHandle.position.y = -0.14;
+  const hammerHead = mesh(geometries.hammerHead, materials.metal, "HammerHead");
+  hammerHead.position.y = 0.2;
+  build.add(hammerHandle, hammerHead);
+
+  rightHand.add(sword, pick, axe, build);
+  return { sword, pick, axe, build };
+}
+
+function syncEquipment(equipment: Record<Exclude<CharacterEquipment, "hands">, THREE.Group>, active: CharacterEquipment): void {
+  equipment.sword.visible = active === "sword";
+  equipment.pick.visible = active === "pick";
+  equipment.axe.visible = active === "axe";
+  equipment.build.visible = active === "build";
 }
 
 function addHead(

@@ -18,6 +18,7 @@ import {
   characterColorVariants,
   characterPresets,
   createPlayerCharacter,
+  type CharacterEquipment,
   type CharacterColorId,
   type CharacterStyleId,
   type PlayerCharacter,
@@ -504,7 +505,15 @@ export class GameApp {
         this.presentationVelocity.normalize().multiplyScalar(0.22);
       }
     }
-    this.playerCharacter.update(deltaSeconds, this.presentationVelocity, this.clock.elapsedTime, this.state.action.attackPulse, this.state.action.gatherPulse);
+    this.playerCharacter.update(
+      deltaSeconds,
+      this.presentationVelocity,
+      this.clock.elapsedTime,
+      this.state.action.attackPulse,
+      this.state.action.gatherPulse,
+      0,
+      this.currentEquipment(),
+    );
 
     const speed = Math.hypot(velocity.x, velocity.z);
     if (!this.dialogueState.active && speed > 1.05 && this.state.player.distanceWalked - this.lastStepDistance > 0.92) {
@@ -703,7 +712,7 @@ export class GameApp {
     const guideY = terrainHeight(GUIDE_NPC_POSITION.x, GUIDE_NPC_POSITION.z);
     this.guideNpc.root.position.set(GUIDE_NPC_POSITION.x, guideY, GUIDE_NPC_POSITION.z);
     const talkAmount = this.dialogueState.active && this.dialogueState.speaker === "Edda" ? 1 : 0;
-    this.guideNpc.update(deltaSeconds, this.previewIdleVelocity, this.clock.elapsedTime + 1.8, 0, 0, talkAmount);
+    this.guideNpc.update(deltaSeconds, this.previewIdleVelocity, this.clock.elapsedTime + 1.8, 0, 0, talkAmount, "hands");
 
     const facing = this.guideNpc.root.getObjectByName("CharacterRig");
     if (facing) {
@@ -1023,6 +1032,23 @@ export class GameApp {
 
   private selectedColorId(): CharacterColorId {
     return characterColorVariants[this.selectedColorIndex]?.id ?? characterColorVariants[0].id;
+  }
+
+  private currentEquipment(): CharacterEquipment {
+    if (this.state.action.attackPulse > 0) return "sword";
+    if (this.state.action.gatherPulse > 0) return this.state.action.toolMotion;
+
+    switch (this.state.ui.selectedSlot) {
+      case "tool":
+        return this.state.quest.pickaxeCrafted ? "pick" : "hands";
+      case "build":
+        return "build";
+      case "attack":
+        return "sword";
+      case "hands":
+      case "pack":
+        return "hands";
+    }
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
