@@ -58,6 +58,7 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
 
   const base = createBaseGround(worldSize);
   const grass = createGrassFloor(worldSize);
+  const openingGrass = createOpeningGrassDetail();
   const biomeDetails = createBiomeGroundDetails(worldSize);
   const path = createPathMosaic(worldSize);
   const branches = createBranchPathMosaics();
@@ -67,7 +68,7 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
   let props = createWorldPropObjects(worldProps);
   let hiddenSignature = "";
 
-  root.add(base.mesh, grass.mesh, biomeDetails.mesh, path.mesh, branches.mesh, edgeBlend.mesh, shorelines.mesh, water.root, props.root);
+  root.add(base.mesh, grass.mesh, openingGrass.mesh, biomeDetails.mesh, path.mesh, branches.mesh, edgeBlend.mesh, shorelines.mesh, water.root, props.root);
 
   return {
     root,
@@ -84,6 +85,7 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
     dispose: () => {
       base.dispose();
       grass.dispose();
+      openingGrass.dispose();
       biomeDetails.dispose();
       path.dispose();
       branches.dispose();
@@ -123,7 +125,7 @@ function createBaseGround(size: number): { mesh: THREE.Mesh; dispose: () => void
 }
 
 function createGrassFloor(size: number): { mesh: THREE.Mesh; dispose: () => void } {
-  const cellSize = size > 900 ? 2.18 : 0.58;
+  const cellSize = size > 900 ? 4.45 : 0.58;
   const half = size / 2;
   const columns = Math.ceil(size / cellSize);
   const rows = Math.ceil(size / cellSize);
@@ -167,6 +169,74 @@ function createGrassFloor(size: number): { mesh: THREE.Mesh; dispose: () => void
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = "IrregularLowPolyGrass";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createOpeningGrassDetail(): { mesh: THREE.Mesh; dispose: () => void } {
+  const minX = -72;
+  const maxX = 72;
+  const minZ = OPENING_PATH_START_Z - 46;
+  const maxZ = 118;
+  const cellSize = 0.82;
+  const columns = Math.ceil((maxX - minX) / cellSize);
+  const rows = Math.ceil((maxZ - minZ) / cellSize);
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  for (let gx = 0; gx < columns; gx += 1) {
+    for (let gz = 0; gz < rows; gz += 1) {
+      const x0 = minX + gx * cellSize;
+      const z0 = minZ + gz * cellSize;
+      const x1 = Math.min(maxX, x0 + cellSize);
+      const z1 = Math.min(maxZ, z0 + cellSize);
+      const centerX = (x0 + x1) * 0.5;
+      const centerZ = (z0 + z1) * 0.5;
+      const pathDistance = Math.abs(centerX - pathCenterX(centerZ));
+
+      if (pathDistance < pathWidthAt(centerZ) * 0.62) continue;
+
+      const worldGX = Math.floor((x0 + WORLD_SIZE * 0.5) / cellSize);
+      const worldGZ = Math.floor((z0 + WORLD_SIZE * 0.5) / cellSize);
+      const a = makeOpeningGrassPoint(x0, z0, worldGX, worldGZ);
+      const b = makeOpeningGrassPoint(x1, z0, worldGX + 1, worldGZ);
+      const c = makeOpeningGrassPoint(x1, z1, worldGX + 1, worldGZ + 1);
+      const d = makeOpeningGrassPoint(x0, z1, worldGX, worldGZ + 1);
+
+      if (valueNoise(worldGX, worldGZ) > 0.5) {
+        addGrassTriangle(positions, colors, a, b, c);
+        addGrassTriangle(positions, colors, a, c, d);
+      } else {
+        addGrassTriangle(positions, colors, a, b, d);
+        addGrassTriangle(positions, colors, b, c, d);
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.98,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -0.35,
+    polygonOffsetUnits: -0.35,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "OpeningGrassDetail";
   mesh.receiveShadow = true;
 
   return {
@@ -958,6 +1028,15 @@ function makeJitteredPoint(x: number, z: number, gx: number, gz: number): Point 
     x + (valueNoise(gx, gz) - 0.5) * jitter,
     z + (valueNoise(gx + 97, gz - 31) - 0.5) * jitter,
     0,
+  );
+}
+
+function makeOpeningGrassPoint(x: number, z: number, gx: number, gz: number): Point {
+  const jitter = 0.11;
+  return makePoint(
+    x + (valueNoise(gx * 3 + 11, gz * 5 - 17) - 0.5) * jitter,
+    z + (valueNoise(gx * 7 - 23, gz * 2 + 29) - 0.5) * jitter,
+    0.024,
   );
 }
 

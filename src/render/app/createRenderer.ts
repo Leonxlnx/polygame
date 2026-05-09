@@ -9,7 +9,7 @@ export function createRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
   });
 
   renderer.setClearColor("#668548");
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio * 1.2, 2.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.65));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;

@@ -1121,26 +1121,21 @@ export class GameApp {
 
   private readonly handleResize = (): void => {
     const canvas = this.renderer.domElement;
-    const viewport = window.visualViewport;
     const width = Math.max(
       1,
-      Math.round(viewport?.width ?? 0),
+      Math.round(canvas.clientWidth),
       Math.round(window.innerWidth),
       Math.round(document.documentElement.clientWidth),
-      Math.round(canvas.clientWidth),
     );
     const height = Math.max(
       1,
-      Math.round(viewport?.height ?? 0),
+      Math.round(canvas.clientHeight),
       Math.round(window.innerHeight),
       Math.round(document.documentElement.clientHeight),
-      Math.round(canvas.clientHeight),
     );
 
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
     resizeCamera(this.camera, width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio * 1.2, 2.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.65));
     this.renderer.setSize(width, height, false);
   };
 
