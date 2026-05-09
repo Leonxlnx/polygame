@@ -6,9 +6,24 @@ export type InputVector = {
   interact: boolean;
   build: boolean;
   inventory: boolean;
+  selectedSlot?: number;
 };
 
-type InputAction = "left" | "right" | "up" | "down" | "sprint" | "attack" | "interact" | "build" | "inventory";
+type InputAction =
+  | "left"
+  | "right"
+  | "up"
+  | "down"
+  | "sprint"
+  | "attack"
+  | "interact"
+  | "build"
+  | "inventory"
+  | "slot1"
+  | "slot2"
+  | "slot3"
+  | "slot4"
+  | "slot5";
 
 const keyToAction = new Map<string, InputAction>([
   ["KeyA", "left"],
@@ -25,11 +40,17 @@ const keyToAction = new Map<string, InputAction>([
   ["KeyE", "interact"],
   ["KeyB", "build"],
   ["KeyI", "inventory"],
+  ["Digit1", "slot1"],
+  ["Digit2", "slot2"],
+  ["Digit3", "slot3"],
+  ["Digit4", "slot4"],
+  ["Digit5", "slot5"],
 ]);
 
 export class InputController {
   private readonly pressed = new Set<string>();
   private readonly queuedActions = new Set<InputAction>();
+  private queuedSlot?: number;
   private disposed = false;
 
   constructor() {
@@ -53,6 +74,9 @@ export class InputController {
       z /= length;
     }
 
+    const selectedSlot = this.queuedSlot;
+    this.queuedSlot = undefined;
+
     return {
       x,
       z,
@@ -61,6 +85,7 @@ export class InputController {
       interact: this.consumeAction("interact"),
       build: this.consumeAction("build"),
       inventory: this.consumeAction("inventory"),
+      selectedSlot,
     };
   }
 
@@ -78,6 +103,10 @@ export class InputController {
     const action = keyToAction.get(event.code);
     if (!action) return;
     event.preventDefault();
+    if (action.startsWith("slot")) {
+      this.queuedSlot = Number(action.slice(4));
+      return;
+    }
     this.pressed.add(action);
     if (action === "attack" || action === "interact" || action === "build" || action === "inventory") {
       this.queuedActions.add(action);

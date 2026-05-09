@@ -1,5 +1,6 @@
 type GameAudio = {
   unlock: () => void;
+  setMuted: (muted: boolean) => void;
   playSelect: () => void;
   playStart: () => void;
   playAttack: () => void;
@@ -46,6 +47,7 @@ export function createGameAudio(): GameAudio {
   let context: AudioContext | undefined;
   let buses: AudioBuses | undefined;
   let ambientStarted = false;
+  let muted = false;
   const lastCueAt = new Map<CueName, number>();
 
   function ensureContext(): AudioContext | undefined {
@@ -65,7 +67,7 @@ export function createGameAudio(): GameAudio {
     const action = audioContext.createGain();
     const ambient = audioContext.createGain();
 
-    master.gain.value = 0.42;
+    master.gain.value = muted ? 0 : 0.42;
     ui.gain.value = 0.24;
     action.gain.value = 0.28;
     ambient.gain.value = 0.055;
@@ -209,6 +211,12 @@ export function createGameAudio(): GameAudio {
 
   return {
     unlock,
+    setMuted: (nextMuted: boolean) => {
+      muted = nextMuted;
+      if (buses && context) {
+        buses.master.gain.setTargetAtTime(muted ? 0 : 0.42, context.currentTime, 0.025);
+      }
+    },
     playSelect: () => {
       playCue("select", () => {
         playTone({ bus: "ui", frequency: 740, endFrequency: 880, duration: 0.055, volume: 0.16 });

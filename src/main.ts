@@ -23,6 +23,12 @@ const dialoguePanel = document.querySelector<HTMLElement>("#dialogue-panel");
 const dialogueSpeaker = document.querySelector<HTMLElement>("#dialogue-speaker");
 const dialogueText = document.querySelector<HTMLElement>("#dialogue-text");
 const dialogueContinue = document.querySelector<HTMLElement>("#dialogue-continue");
+const settingsButton = document.querySelector<HTMLButtonElement>("#settings-button");
+const hudSettingsButton = document.querySelector<HTMLButtonElement>("#hud-settings-button");
+const settingsPanel = document.querySelector<HTMLElement>("#settings-panel");
+const settingsClose = document.querySelector<HTMLButtonElement>("#settings-close");
+const settingsAudio = document.querySelector<HTMLInputElement>("#settings-audio");
+const settingsMotion = document.querySelector<HTMLInputElement>("#settings-motion");
 
 if (
   !canvas ||
@@ -46,7 +52,13 @@ if (
   !dialoguePanel ||
   !dialogueSpeaker ||
   !dialogueText ||
-  !dialogueContinue
+  !dialogueContinue ||
+  !settingsButton ||
+  !hudSettingsButton ||
+  !settingsPanel ||
+  !settingsClose ||
+  !settingsAudio ||
+  !settingsMotion
 ) {
   throw new Error("Hearthwild could not find its required UI roots.");
 }
@@ -90,6 +102,12 @@ const app = new GameApp({
     dialogueSpeaker,
     dialogueText,
     dialogueContinue,
+    settingsButton,
+    hudSettingsButton,
+    settingsPanel,
+    settingsClose,
+    settingsAudio,
+    settingsMotion,
   },
 });
 app.start();

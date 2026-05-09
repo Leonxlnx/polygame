@@ -5,6 +5,8 @@ import { biomeAt, OPENING_PATH_START_Z, pathCenterX, type BiomeId, WORLD_SIZE } 
 
 export type ResourceKind = "wood" | "stone" | "herb" | "coin";
 export type EnemyKind = "trailGuardian" | "boar" | "stoneSentinel" | "reedWisp";
+export type HotbarSlot = "hands" | "tool" | "build" | "attack" | "pack";
+export type ToolMotion = "hands" | "pick" | "axe" | "sword" | "build";
 export type TutorialStage =
   | "wakeInCove"
   | "walkToGuide"
@@ -108,6 +110,7 @@ export type GameState = {
   resources: Record<ResourceKind, number>;
   ui: {
     inventoryOpen: boolean;
+    selectedSlot: HotbarSlot;
   };
   quest: {
     tutorialStage: TutorialStage;
@@ -143,6 +146,7 @@ export type GameState = {
     harvestingNodeId: string;
     harvestingTimer: number;
     harvestingDuration: number;
+    toolMotion: ToolMotion;
     harvestEvents: HarvestEvent[];
     dialogueRequest: DialogueRequest;
     chapterCueTitle: string;
@@ -189,6 +193,7 @@ export function createGameState(): GameState {
     },
     ui: {
       inventoryOpen: false,
+      selectedSlot: "hands",
     },
     quest: {
       tutorialStage: "wakeInCove",
@@ -224,6 +229,7 @@ export function createGameState(): GameState {
       harvestingNodeId: "",
       harvestingTimer: 0,
       harvestingDuration: 0,
+      toolMotion: "hands",
       harvestEvents: [],
       dialogueRequest: {
         id: 0,

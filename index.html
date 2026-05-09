@@ -23,6 +23,7 @@
           <span class="resource-chip resource-herb"><i aria-hidden="true"></i><span>Herb</span><strong id="herb-value">0</strong></span>
           <span class="resource-chip resource-coin"><i aria-hidden="true"></i><span>Coin</span><strong id="coin-value">0</strong></span>
         </div>
+        <button id="hud-settings-button" class="hud-settings-button" type="button" aria-label="Settings">Settings</button>
         <div id="quest-panel" class="quest-panel">
           <div class="quest-title">Next Step</div>
           <div id="objective-value" class="objective-value">Follow the morning path.</div>
@@ -67,7 +68,7 @@
         </div>
       </div>
       <section id="main-menu" class="screen screen-menu" aria-label="Main menu">
-        <button class="settings-button" type="button" aria-label="Settings">Settings</button>
+        <button id="settings-button" class="settings-button" type="button" aria-label="Settings">Settings</button>
         <div class="menu-copy">
           <h1>Hearthwild</h1>
           <p class="menu-line">A quiet valley before the first trail.</p>
@@ -107,6 +108,23 @@
             <button id="select-character" class="primary-action" type="button">Select</button>
             <button id="next-character" class="icon-action" type="button" aria-label="Next character">›</button>
           </div>
+        </div>
+      </section>
+      <section id="settings-panel" class="settings-panel is-hidden" role="dialog" aria-label="Settings">
+        <div class="settings-card">
+          <div>
+            <p class="eyebrow">Settings</p>
+            <h2>Game Feel</h2>
+          </div>
+          <label class="settings-row">
+            <span>Audio</span>
+            <input id="settings-audio" type="checkbox" checked />
+          </label>
+          <label class="settings-row">
+            <span>Reduced motion</span>
+            <input id="settings-motion" type="checkbox" />
+          </label>
+          <button id="settings-close" class="primary-action" type="button">Close</button>
         </div>
       </section>
     </div>

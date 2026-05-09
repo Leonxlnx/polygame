@@ -1,5 +1,5 @@
 import type { InputVector } from "../input/InputController";
-import { GUIDE_NPC_POSITION, requestDialogue, type EnemyState, type GameState, type ResourceNode } from "./GameState";
+import { GUIDE_NPC_POSITION, requestDialogue, type EnemyState, type GameState, type HotbarSlot, type ResourceNode, type ToolMotion } from "./GameState";
 import type { WorldCollider } from "../content/worldProps";
 import { biomeAt, biomeLabel } from "../content/worldMap";
 
@@ -69,6 +69,10 @@ function tickTimers(state: GameState, deltaSeconds: number): void {
 }
 
 function handlePlayerActions(state: GameState, input: InputVector): void {
+  if (input.selectedSlot !== undefined) {
+    selectHotbarSlot(state, input.selectedSlot);
+  }
+
   const nearestNode = findNearestResourceNode(state);
   const nearestEnemy = findNearestEnemy(state, 2.05);
   const guideNearby = isGuideNearby(state);
@@ -91,6 +95,7 @@ function handlePlayerActions(state: GameState, input: InputVector): void {
   if (state.action.harvestingNodeId) return;
 
   if (input.attack && state.action.attackCooldown <= 0) {
+    state.ui.selectedSlot = "attack";
     performAttack(state);
   }
 
@@ -110,11 +115,13 @@ function handlePlayerActions(state: GameState, input: InputVector): void {
   }
 
   if (input.build && state.action.buildCooldown <= 0) {
+    state.ui.selectedSlot = "build";
     state.action.buildCooldown = 0.55;
     buildCampStructure(state);
   }
 
   if (input.inventory && state.action.interactCooldown <= 0) {
+    state.ui.selectedSlot = "pack";
     state.action.interactCooldown = 0.55;
     if (!canOpenPack(state)) {
       showMessage(state, "Your pack is still empty.");
@@ -122,6 +129,54 @@ function handlePlayerActions(state: GameState, input: InputVector): void {
     }
     state.ui.inventoryOpen = !state.ui.inventoryOpen;
     showMessage(state, state.ui.inventoryOpen ? "Pack opened." : "Pack closed.");
+  }
+}
+
+function selectHotbarSlot(state: GameState, slotNumber: number): void {
+  const slot = slotFromNumber(slotNumber);
+  if (!slot) return;
+
+  if (!isSlotUnlocked(state, slot)) {
+    state.ui.selectedSlot = "hands";
+    showMessage(state, `${slotLabel(slot)} is not ready yet. Follow the next step first.`);
+    return;
+  }
+
+  state.ui.selectedSlot = slot;
+  showMessage(state, `${slotLabel(slot)} selected.`);
+}
+
+function slotFromNumber(slotNumber: number): HotbarSlot | undefined {
+  return (["hands", "tool", "build", "attack", "pack"] as const)[slotNumber - 1];
+}
+
+function isSlotUnlocked(state: GameState, slot: HotbarSlot): boolean {
+  switch (slot) {
+    case "hands":
+      return state.quest.tutorialStage !== "wakeInCove";
+    case "tool":
+      return state.quest.pickaxeCrafted;
+    case "build":
+      return state.quest.cabinBuilt || state.quest.tutorialStage === "buildShelter" || state.quest.tutorialStage === "buildCampfire";
+    case "attack":
+      return state.quest.tutorialStage === "practiceSwing" || state.quest.combatUnlocked;
+    case "pack":
+      return canOpenPack(state);
+  }
+}
+
+function slotLabel(slot: HotbarSlot): string {
+  switch (slot) {
+    case "hands":
+      return "Hands";
+    case "tool":
+      return "Tool";
+    case "build":
+      return "Build";
+    case "attack":
+      return "Sword";
+    case "pack":
+      return "Pack";
   }
 }
 
@@ -138,6 +193,7 @@ function updateOpeningWalk(state: GameState): void {
 function performAttack(state: GameState): void {
   state.action.attackCooldown = 0.54;
   state.action.attackPulse = 0.34;
+  state.action.toolMotion = "sword";
   state.quest.attackPracticed = true;
 
   if (state.quest.tutorialStage === "practiceSwing") {
@@ -266,11 +322,18 @@ function useResourceNode(state: GameState, node: ResourceNode): void {
   }
 
   const duration = harvestDurationForNode(node);
+  state.action.toolMotion = toolMotionForNode(node);
   state.action.harvestingNodeId = node.id;
   state.action.harvestingTimer = duration;
   state.action.harvestingDuration = duration;
   state.action.gatherPulse = Math.max(state.action.gatherPulse, duration);
   showMessage(state, harvestStartMessage(node));
+}
+
+function toolMotionForNode(node: ResourceNode): ToolMotion {
+  if (node.kind === "rock" || node.kind === "ore" || node.kind === "boulder" || node.kind === "crystal") return "pick";
+  if (isTreeNode(node) || node.kind === "stump") return "axe";
+  return "hands";
 }
 
 function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
@@ -400,6 +463,7 @@ function buildCampStructure(state: GameState): void {
 
   state.resources.wood -= 2;
   state.resources.stone -= 1;
+  state.action.toolMotion = "build";
   state.world.buildings.push({
     id: `cabin-${state.world.buildings.length + 1}`,
     kind: "cabin",
@@ -431,6 +495,7 @@ function buildCampfire(state: GameState): void {
   state.resources.wood -= 2;
   state.resources.stone -= 1;
   state.resources.herb -= 1;
+  state.action.toolMotion = "build";
   state.world.buildings.push({
     id: `campfire-${state.world.buildings.length + 1}`,
     kind: "campfire",

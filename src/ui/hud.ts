@@ -58,7 +58,7 @@ export function createHud(root: HTMLElement): Hud {
       questPanel.classList.toggle("has-camp", campVisible);
       campMeter.classList.toggle("is-unavailable", !campVisible);
 
-      const handsUnlocked = isAtLeast(state.quest.tutorialStage, "gatherWood");
+      const handsUnlocked = state.quest.tutorialStage !== "wakeInCove";
       const packUnlocked = handsUnlocked && totalResources(state) > 0;
       const toolUnlocked = state.quest.pickaxeCrafted;
       const buildUnlocked = state.quest.cabinBuilt || state.quest.tutorialStage === "buildShelter" || state.quest.tutorialStage === "buildCampfire";
@@ -76,13 +76,13 @@ export function createHud(root: HTMLElement): Hud {
       herbChip.classList.toggle("is-unavailable", !herbUnlocked);
       coinChip.classList.toggle("is-unavailable", !coinUnlocked);
 
-      setSlot(handsSlot, handsUnlocked, true);
-      setSlot(packSlot, packUnlocked, true);
-      setSlot(toolSlot, toolUnlocked, state.quest.pickaxeCrafted);
-      setSlot(buildSlot, buildUnlocked, buildUnlocked);
-      setSlot(attackSlot, attackUnlocked, attackUnlocked && !state.quest.combatUnlocked ? true : state.quest.combatUnlocked);
+      setSlot(handsSlot, handsUnlocked, true, state.ui.selectedSlot === "hands");
+      setSlot(toolSlot, toolUnlocked, state.quest.pickaxeCrafted, state.ui.selectedSlot === "tool");
+      setSlot(buildSlot, buildUnlocked, buildUnlocked, state.ui.selectedSlot === "build");
+      setSlot(attackSlot, attackUnlocked, attackUnlocked, state.ui.selectedSlot === "attack");
+      setSlot(packSlot, packUnlocked, packUnlocked, state.ui.selectedSlot === "pack");
       buildSlot.querySelector("strong")!.textContent = state.quest.tutorialStage === "buildCampfire" ? "Fire" : "Build";
-      hotbar.classList.toggle("is-hidden", !handsUnlocked);
+      hotbar.classList.toggle("is-hidden", state.quest.tutorialStage === "wakeInCove");
 
       interactPrompt.textContent = state.action.prompt;
       interactPrompt.classList.toggle("is-hidden", state.action.prompt.length === 0);
@@ -104,10 +104,11 @@ function requireElement(root: HTMLElement, selector: string): HTMLElement {
   return element;
 }
 
-function setSlot(slot: HTMLElement, unlocked: boolean, ready: boolean): void {
+function setSlot(slot: HTMLElement, unlocked: boolean, ready: boolean, selected: boolean): void {
   slot.classList.toggle("is-unlocked", unlocked);
   slot.classList.toggle("is-ready", unlocked && ready);
-  slot.classList.toggle("is-locked", unlocked && !ready);
+  slot.classList.toggle("is-locked", !ready);
+  slot.classList.toggle("is-selected", selected && unlocked);
 }
 
 function isAtLeast(current: TutorialStage, target: TutorialStage): boolean {

@@ -47,6 +47,12 @@ type GameUi = {
   dialogueSpeaker: HTMLElement;
   dialogueText: HTMLElement;
   dialogueContinue: HTMLElement;
+  settingsButton: HTMLButtonElement;
+  hudSettingsButton: HTMLButtonElement;
+  settingsPanel: HTMLElement;
+  settingsClose: HTMLButtonElement;
+  settingsAudio: HTMLInputElement;
+  settingsMotion: HTMLInputElement;
 };
 
 type GameAppOptions = {
@@ -274,6 +280,11 @@ export class GameApp {
     this.ui.prevColor.removeEventListener("click", this.selectPreviousColor);
     this.ui.nextColor.removeEventListener("click", this.selectNextColor);
     this.ui.dialoguePanel.removeEventListener("click", this.advanceDialogue);
+    this.ui.settingsButton.removeEventListener("click", this.openSettings);
+    this.ui.hudSettingsButton.removeEventListener("click", this.openSettings);
+    this.ui.settingsClose.removeEventListener("click", this.closeSettings);
+    this.ui.settingsAudio.removeEventListener("change", this.syncSettings);
+    this.ui.settingsMotion.removeEventListener("change", this.syncSettings);
     this.renderer.domElement.removeEventListener("pointerdown", this.handlePointerDown);
     this.renderer.domElement.removeEventListener("wheel", this.handleWheel);
     window.removeEventListener("pointermove", this.handlePointerMove);
@@ -293,7 +304,27 @@ export class GameApp {
     this.ui.prevColor.addEventListener("click", this.selectPreviousColor);
     this.ui.nextColor.addEventListener("click", this.selectNextColor);
     this.ui.dialoguePanel.addEventListener("click", this.advanceDialogue);
+    this.ui.settingsButton.addEventListener("click", this.openSettings);
+    this.ui.hudSettingsButton.addEventListener("click", this.openSettings);
+    this.ui.settingsClose.addEventListener("click", this.closeSettings);
+    this.ui.settingsAudio.addEventListener("change", this.syncSettings);
+    this.ui.settingsMotion.addEventListener("change", this.syncSettings);
   }
+
+  private readonly openSettings = (): void => {
+    this.ui.settingsPanel.classList.remove("is-hidden");
+    this.audio.playSelect();
+  };
+
+  private readonly closeSettings = (): void => {
+    this.ui.settingsPanel.classList.add("is-hidden");
+    this.audio.playSelect();
+  };
+
+  private readonly syncSettings = (): void => {
+    this.audio.setMuted(!this.ui.settingsAudio.checked);
+    document.documentElement.classList.toggle("reduce-motion", this.ui.settingsMotion.checked);
+  };
 
   private readonly beginLoading = (): void => {
     this.audio.unlock();
