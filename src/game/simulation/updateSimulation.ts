@@ -87,7 +87,7 @@ function handlePlayerActions(state: GameState, input: InputVector): void {
     const hits = nearestNode.hitsRemaining > 1 ? ` ${nearestNode.maxHits - nearestNode.hitsRemaining + 1}/${nearestNode.maxHits}` : "";
     state.action.prompt = `E ${nearestNode.actionLabel}${hits}`;
   } else if (canBuildCurrentCampStructure(state)) {
-    state.action.prompt = state.quest.tutorialStage === "buildCampfire" ? "B Build campfire" : "B Build shelter";
+    state.action.prompt = buildPrompt(state);
   } else {
     state.action.prompt = "";
   }
@@ -155,11 +155,11 @@ function isSlotUnlocked(state: GameState, slot: HotbarSlot): boolean {
     case "hands":
       return state.quest.tutorialStage !== "wakeInCove";
     case "tool":
-      return state.quest.pickaxeCrafted;
+      return state.quest.pickaxeCrafted || state.quest.axeCrafted;
     case "build":
-      return state.quest.cabinBuilt || state.quest.tutorialStage === "buildShelter" || state.quest.tutorialStage === "buildCampfire";
+      return state.quest.cabinBuilt || state.quest.tutorialStage === "buildShelter" || state.quest.tutorialStage === "buildCampfire" || state.quest.tutorialStage === "repairBridge";
     case "attack":
-      return state.quest.tutorialStage === "practiceSwing" || state.quest.combatUnlocked;
+      return state.quest.tutorialStage === "practiceSwing" || state.quest.tutorialStage === "clearGuardian" || state.quest.combatUnlocked;
     case "pack":
       return canOpenPack(state);
   }
@@ -210,6 +210,10 @@ function performAttack(state: GameState): void {
     return;
   }
 
+  if (state.quest.tutorialStage === "clearGuardian") {
+    state.quest.attackPracticed = true;
+  }
+
   if (!state.quest.combatUnlocked) {
     showMessage(state, "Edda will call for weapon practice when the camp is set.");
     return;
@@ -235,7 +239,12 @@ function performAttack(state: GameState): void {
     enemy.defeated = true;
     state.resources.coin += 3;
     state.quest.enemyDefeated = true;
-    showMessage(state, "Guardian defeated. You recovered 3 coins.");
+    if (state.quest.tutorialStage === "clearGuardian") {
+      state.quest.tutorialStage = "returnGuardian";
+      showMessage(state, "Guardian defeated. Return to Edda.");
+    } else {
+      showMessage(state, "Guardian defeated. You recovered 3 coins.");
+    }
   } else {
     showMessage(state, "Hit landed.");
   }
@@ -274,26 +283,17 @@ function useResourceNode(state: GameState, node: ResourceNode): void {
   if (state.action.harvestingNodeId) return;
 
   if (node.resource === "craft") {
+    if (state.quest.tutorialStage === "craftAxe") {
+      craftAxe(state);
+      return;
+    }
+
     if (state.quest.tutorialStage !== "craftPickaxe" || state.quest.pickaxeCrafted) {
-      showMessage(state, state.quest.pickaxeCrafted ? "The wooden pick is ready." : "Edda will show you what to make first.");
+      showMessage(state, state.quest.axeCrafted ? "The axe and wooden pick are ready." : state.quest.pickaxeCrafted ? "The wooden pick is ready." : "Edda will show you what to make first.");
       return;
     }
 
-    if (state.resources.wood < 3) {
-      showMessage(state, "A wooden pick needs 3 wood.");
-      return;
-    }
-
-    state.resources.wood -= 3;
-    state.action.gatherPulse = 0.42;
-    state.quest.pickaxeCrafted = true;
-    state.quest.toolLevel = Math.max(state.quest.toolLevel, 1);
-    state.quest.tutorialStage = "mineStone";
-    showMessage(state, "Wooden pick crafted.");
-    requestDialogue(state, "Edda", [
-      "Good. Now the small grey stones along the bend will give way.",
-      "Bring me three pieces of stone. After that, the camp can start to grow.",
-    ]);
+    craftPickaxe(state);
     return;
   }
 
@@ -339,6 +339,53 @@ function toolMotionForNode(node: ResourceNode): ToolMotion {
   return "hands";
 }
 
+function craftPickaxe(state: GameState): void {
+  if (state.resources.wood < 3) {
+    showMessage(state, "A wooden pick needs 3 wood.");
+    return;
+  }
+
+  state.resources.wood -= 3;
+  state.action.gatherPulse = 0.42;
+  state.action.toolMotion = "build";
+  state.quest.pickaxeCrafted = true;
+  state.quest.toolLevel = Math.max(state.quest.toolLevel, 1);
+  state.quest.tutorialStage = "mineStone";
+  showMessage(state, "Wooden pick crafted.");
+  requestDialogue(state, "Edda", [
+    "Good. Now the small grey stones along the bend will give way.",
+    "Bring me three pieces of stone. After that, the camp can start to grow.",
+    "Notice the rhythm: approach, start, commit, finish, then the world actually changes.",
+  ]);
+}
+
+function craftAxe(state: GameState): void {
+  if (state.quest.axeCrafted) {
+    showMessage(state, "The camp axe is ready.");
+    return;
+  }
+
+  if (state.resources.wood < 4 || state.resources.stone < 1) {
+    showMessage(state, "A camp axe needs 4 wood and 1 stone.");
+    return;
+  }
+
+  state.resources.wood -= 4;
+  state.resources.stone -= 1;
+  state.action.gatherPulse = 0.52;
+  state.action.toolMotion = "build";
+  state.quest.axeCrafted = true;
+  state.quest.toolLevel = Math.max(state.quest.toolLevel, 2);
+  state.quest.tutorialStage = "fellTree";
+  showMessage(state, "Camp axe crafted.");
+  requestDialogue(state, "Edda", [
+    "Now the living trees are no longer just walls.",
+    "Do not clear the forest because you can. Choose one tree near the trail and fell it cleanly.",
+    "A bigger tool should widen your choices, not erase the shape of the place.",
+    "When it falls, bring the wood back. Then we repair the broken crossing below camp.",
+  ]);
+}
+
 function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
   node.hitsRemaining = Math.max(0, node.hitsRemaining - 1);
   state.action.gatherPulse = Math.max(state.action.gatherPulse, 0.34);
@@ -353,6 +400,13 @@ function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
   node.active = false;
   if (!isResourceKind(node.resource)) return;
   state.resources[node.resource] += node.amount;
+
+  if (isTreeNode(node) && state.quest.tutorialStage === "fellTree") {
+    state.quest.treeChopped = true;
+    state.quest.tutorialStage = "returnTree";
+    showMessage(state, "Tree felled. Return to Edda.");
+    return;
+  }
 
   if (node.resource === "wood" && state.resources.wood >= state.quest.woodTarget) {
     state.quest.woodGathered = true;
@@ -449,6 +503,11 @@ function pushHarvestEvent(state: GameState, node: ResourceNode, final = true): v
 }
 
 function buildCampStructure(state: GameState): void {
+  if (state.quest.tutorialStage === "repairBridge") {
+    repairTrailBridge(state);
+    return;
+  }
+
   if (state.quest.tutorialStage === "buildCampfire") {
     buildCampfire(state);
     return;
@@ -511,15 +570,48 @@ function buildCampfire(state: GameState): void {
   state.world.colliders.push({ type: "circle", x, z, radius: 0.42 });
   state.quest.campfireBuilt = true;
   state.quest.campLevel = Math.max(state.quest.campLevel, 2);
-  state.quest.tutorialStage = "firstCampReady";
-  state.quest.combatUnlocked = true;
-  showMessage(state, "Campfire lit. The lower trail is open.");
+  state.quest.tutorialStage = "craftAxe";
+  state.quest.combatUnlocked = false;
+  showMessage(state, "Campfire lit. Edda has the next tool plan.");
   requestDialogue(state, "Edda", [
     "Now the camp has smoke, shelter, tools, and a reason to return.",
     "That is the difference between wandering and exploring: a place behind you that still matters.",
-    "The lower trail is open. You can follow it, ignore it, circle the rocks, or come back with better tools.",
-    "Fight only when you choose the angle. Gather when the path offers something useful. Build when the land asks for a mark.",
-    "If the valley feels quiet, good. Quiet means you can hear what changed.",
+    "We are not rushing to the lower trail yet. First we make the tool that changes how the forest answers you.",
+    "Use the workbench again. Four wood and one stone will become a camp axe.",
+    "Then we choose one tree, repair one crossing, and only then do we wake the guardian.",
+  ]);
+}
+
+function repairTrailBridge(state: GameState): void {
+  if (!canRepairBridge(state)) {
+    showMessage(state, "Bridge repair needs 4 wood and 2 stone.");
+    return;
+  }
+
+  const forwardX = Math.sin(state.player.facingYaw);
+  const forwardZ = Math.cos(state.player.facingYaw);
+  const x = state.player.position.x + forwardX * 2.45;
+  const z = state.player.position.z + forwardZ * 2.45;
+
+  state.resources.wood -= 4;
+  state.resources.stone -= 2;
+  state.action.toolMotion = "build";
+  state.world.buildings.push({
+    id: `bridge-${state.world.buildings.length + 1}`,
+    kind: "bridge",
+    position: state.player.position.clone().set(x, 0, z),
+    rotation: state.player.facingYaw + Math.PI,
+  });
+  state.quest.bridgeRepaired = true;
+  state.quest.campLevel = Math.max(state.quest.campLevel, 3);
+  state.quest.tutorialStage = "clearGuardian";
+  state.quest.combatUnlocked = true;
+  showMessage(state, "Crossing repaired. The guardian hears you.");
+  requestDialogue(state, "Edda", [
+    "Good. That repair matters because it gives you a way back.",
+    "The first guardian patrols below the bend. Do not chase it into the trees.",
+    "Walk in, keep your feet under you, swing once, recover, and read the next step.",
+    "If it pushes you back, that is not failure. It is the valley teaching force.",
   ]);
 }
 
@@ -531,8 +623,18 @@ function canBuildCampfire(state: GameState): boolean {
   return state.quest.tutorialStage === "buildCampfire" && state.resources.wood >= 2 && state.resources.stone >= 1 && state.resources.herb >= 1;
 }
 
+function canRepairBridge(state: GameState): boolean {
+  return state.quest.tutorialStage === "repairBridge" && state.resources.wood >= 4 && state.resources.stone >= 2;
+}
+
 function canBuildCurrentCampStructure(state: GameState): boolean {
-  return canBuildShelter(state) || canBuildCampfire(state);
+  return canBuildShelter(state) || canBuildCampfire(state) || canRepairBridge(state);
+}
+
+function buildPrompt(state: GameState): string {
+  if (state.quest.tutorialStage === "buildCampfire") return "B Build campfire";
+  if (state.quest.tutorialStage === "repairBridge") return "B Repair crossing";
+  return "B Build shelter";
 }
 
 function findNearestResourceNode(state: GameState): ResourceNode | undefined {
@@ -626,13 +728,6 @@ export function updateQuest(state: GameState): void {
   const herbCount = `${Math.min(state.resources.herb, state.quest.herbTarget)} / ${state.quest.herbTarget}`;
   state.quest.checklist = activeChecklist(state, woodCount, stoneCount, herbCount);
 
-  if (state.quest.combatUnlocked && !state.quest.enemyDefeated) {
-    state.quest.currentObjective = state.quest.attackPracticed
-      ? "Face the guardian beyond camp."
-      : "Practice one swing before you engage.";
-    return;
-  }
-
   switch (state.quest.tutorialStage) {
     case "wakeInCove":
       state.quest.currentObjective = "Walk out of the cove.";
@@ -672,6 +767,24 @@ export function updateQuest(state: GameState): void {
       break;
     case "buildCampfire":
       state.quest.currentObjective = "Build a campfire: 2 wood, 1 stone, 1 herb.";
+      break;
+    case "craftAxe":
+      state.quest.currentObjective = "Craft a camp axe: 4 wood, 1 stone.";
+      break;
+    case "fellTree":
+      state.quest.currentObjective = "Fell one trail tree with the axe.";
+      break;
+    case "returnTree":
+      state.quest.currentObjective = "Return to Edda with the felled wood.";
+      break;
+    case "repairBridge":
+      state.quest.currentObjective = "Repair the lower crossing: 4 wood, 2 stone.";
+      break;
+    case "clearGuardian":
+      state.quest.currentObjective = "Defeat the first trail guardian.";
+      break;
+    case "returnGuardian":
+      state.quest.currentObjective = "Return to Edda after the fight.";
       break;
     case "firstCampReady":
       state.quest.currentObjective = "Follow the lower trail when ready.";
@@ -793,6 +906,56 @@ function talkToGuide(state: GameState): void {
         "The flame is the first promise: leave, risk something, come back changed.",
       ]);
       break;
+    case "craftAxe":
+      requestDialogue(state, "Edda", [
+        "The fire is alive. Good. Now make the tool that lets the forest answer back.",
+        "Use the workbench: four wood and one stone for a camp axe.",
+        "If you need more material, stay near the path edge. The opening should never ask you to wander blind.",
+      ]);
+      break;
+    case "fellTree":
+      requestDialogue(state, "Edda", [
+        "Choose one tree near the lower trail.",
+        "A clean chop is not a button mash. Plant your feet, let the axe bite, then recover.",
+        "When the tree falls, the space it occupied must become real space. Walk through it and feel that the world kept track.",
+      ]);
+      break;
+    case "returnTree":
+      state.quest.treeChopped = true;
+      state.quest.tutorialStage = "repairBridge";
+      requestDialogue(state, "Edda", [
+        "That is enough. We do not need a bare forest.",
+        "Now repair the broken crossing below the camp. Four wood and two stone.",
+        "A bridge is a promise in both directions: forward adventure, backward safety.",
+        "Place it where your feet naturally want to continue.",
+      ]);
+      showMessage(state, "Crossing repair unlocked.");
+      break;
+    case "repairBridge":
+      requestDialogue(state, "Edda", [
+        "The crossing needs four wood and two stone.",
+        "Build it near the lower trail, where the ground narrows.",
+        "After that, the first guardian wakes. The fight should feel earned, not dumped on your head.",
+      ]);
+      break;
+    case "clearGuardian":
+      requestDialogue(state, "Edda", [
+        "The guardian is awake below the bend.",
+        "Do not fight in the trees. Keep the path at your back and the open grass to your side.",
+        "One swing, recover, step. That is the whole lesson.",
+      ]);
+      break;
+    case "returnGuardian":
+      state.quest.tutorialStage = "firstCampReady";
+      requestDialogue(state, "Edda", [
+        "You came back. That matters more than the coins.",
+        "Now the camp has a loop: gather, craft, build, fight, return, improve.",
+        "The valley opens from here in branches, not a straight line.",
+        "East is stone and old signs. West is water and reeds. North is cold timber.",
+        "Pick a direction when you are ready. The next chapter should begin because you chose it.",
+      ]);
+      showMessage(state, "Chapter complete. The lower trail is yours.");
+      break;
     case "firstCampReady":
       requestDialogue(state, "Edda", [
         "The first lesson is done.",
@@ -830,6 +993,18 @@ function activeChecklist(state: GameState, woodCount: string, stoneCount: string
       return [{ label: state.quest.herbsDelivered ? "Herbs checked" : `Herbs ${herbCount}`, complete: state.quest.herbsDelivered }];
     case "buildCampfire":
       return [{ label: state.quest.campfireBuilt ? "Campfire lit" : "Build campfire", complete: state.quest.campfireBuilt }];
+    case "craftAxe":
+      return [{ label: state.quest.axeCrafted ? "Axe crafted" : "Craft camp axe", complete: state.quest.axeCrafted }];
+    case "fellTree":
+      return [{ label: state.quest.treeChopped ? "Tree felled" : "Fell one tree", complete: state.quest.treeChopped }];
+    case "returnTree":
+      return [{ label: "Return with timber", complete: false }];
+    case "repairBridge":
+      return [{ label: state.quest.bridgeRepaired ? "Crossing repaired" : "Repair crossing", complete: state.quest.bridgeRepaired }];
+    case "clearGuardian":
+      return [{ label: state.quest.enemyDefeated ? "Guardian defeated" : "Defeat guardian", complete: state.quest.enemyDefeated }];
+    case "returnGuardian":
+      return [{ label: "Report back", complete: false }];
     case "firstCampReady":
       return [{ label: "Trail unlocked", complete: true }];
   }

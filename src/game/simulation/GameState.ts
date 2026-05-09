@@ -21,6 +21,12 @@ export type TutorialStage =
   | "gatherHerbs"
   | "returnHerbs"
   | "buildCampfire"
+  | "craftAxe"
+  | "fellTree"
+  | "returnTree"
+  | "repairBridge"
+  | "clearGuardian"
+  | "returnGuardian"
   | "firstCampReady";
 
 export const GUIDE_NPC_POSITION = { x: -6.35, z: -0.55 } as const;
@@ -76,7 +82,7 @@ export type EnemyState = {
 
 export type BuildingState = {
   id: string;
-  kind: "cabin" | "campfire";
+  kind: "cabin" | "campfire" | "bridge";
   position: THREE.Vector3;
   rotation: number;
 };
@@ -124,8 +130,11 @@ export type GameState = {
     herbsGathered: boolean;
     herbsDelivered: boolean;
     pickaxeCrafted: boolean;
+    axeCrafted: boolean;
     cabinBuilt: boolean;
     campfireBuilt: boolean;
+    treeChopped: boolean;
+    bridgeRepaired: boolean;
     attackPracticed: boolean;
     enemyDefeated: boolean;
     combatUnlocked: boolean;
@@ -207,8 +216,11 @@ export function createGameState(): GameState {
       herbsGathered: false,
       herbsDelivered: false,
       pickaxeCrafted: false,
+      axeCrafted: false,
       cabinBuilt: false,
       campfireBuilt: false,
+      treeChopped: false,
+      bridgeRepaired: false,
       attackPracticed: false,
       enemyDefeated: false,
       combatUnlocked: false,

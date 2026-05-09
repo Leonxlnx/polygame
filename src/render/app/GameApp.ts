@@ -417,6 +417,8 @@ export class GameApp {
       this.state.quest.attackPracticed = true;
       this.state.quest.tutorialStage = "firstCampReady";
       this.state.quest.pickaxeCrafted = true;
+      this.state.quest.axeCrafted = true;
+      this.state.quest.bridgeRepaired = true;
       this.state.player.invulnerable = 3;
       this.state.action.message = "";
       this.state.action.messageTimer = 0;
@@ -833,24 +835,27 @@ export class GameApp {
 
   private syncBuildPreview(): void {
     const stage = this.state.quest.tutorialStage;
-    const previewKind = stage === "buildShelter" ? "cabin" : stage === "buildCampfire" ? "campfire" : "";
+    const previewKind = stage === "buildShelter" ? "cabin" : stage === "buildCampfire" ? "campfire" : stage === "repairBridge" ? "bridge" : "";
     this.buildPreview.visible = previewKind.length > 0 && this.phase === "playing" && !this.dialogueState.active;
     if (!this.buildPreview.visible) return;
 
     const yaw = this.state.player.facingYaw;
     const forwardX = Math.sin(yaw);
     const forwardZ = Math.cos(yaw);
-    const distance = previewKind === "campfire" ? 1.8 : 2.2;
+    const distance = previewKind === "campfire" ? 1.8 : previewKind === "bridge" ? 2.45 : 2.2;
     const x = this.state.player.position.x + forwardX * distance;
     const z = this.state.player.position.z + forwardZ * distance;
     const canAfford = previewKind === "campfire"
       ? this.state.resources.wood >= 2 && this.state.resources.stone >= 1 && this.state.resources.herb >= 1
+      : previewKind === "bridge"
+        ? this.state.resources.wood >= 4 && this.state.resources.stone >= 2
       : this.state.resources.wood >= 2 && this.state.resources.stone >= 1;
 
     this.buildPreview.position.set(x, terrainHeight(x, z) + 0.035, z);
     this.buildPreview.rotation.y = yaw + Math.PI;
     this.buildPreview.getObjectByName("PreviewCabin")!.visible = previewKind === "cabin";
     this.buildPreview.getObjectByName("PreviewCampfire")!.visible = previewKind === "campfire";
+    this.buildPreview.getObjectByName("PreviewBridge")!.visible = previewKind === "bridge";
     this.buildPreview.traverse((object) => {
       const material = (object as THREE.Mesh).material;
       if (!material || Array.isArray(material)) return;
@@ -1426,7 +1431,9 @@ function enemyStyle(enemy: EnemyState): {
 }
 
 function createBuildingView(building: BuildingState): THREE.Group {
-  return building.kind === "campfire" ? createCampfireView(building) : createCabinView(building);
+  if (building.kind === "campfire") return createCampfireView(building);
+  if (building.kind === "bridge") return createBridgeView(building);
+  return createCabinView(building);
 }
 
 function createCabinView(building: BuildingState): THREE.Group {
@@ -1516,6 +1523,44 @@ function createCampfireView(building: BuildingState): THREE.Group {
   return group;
 }
 
+function createBridgeView(building: BuildingState): THREE.Group {
+  const group = new THREE.Group();
+  group.name = building.id;
+  group.position.set(building.position.x, terrainHeight(building.position.x, building.position.z), building.position.z);
+  group.rotation.y = building.rotation;
+
+  const plankMaterial = new THREE.MeshStandardMaterial({ color: "#805537", roughness: 0.94, flatShading: true });
+  const ropeMaterial = new THREE.MeshStandardMaterial({ color: "#d3b36f", roughness: 0.9, flatShading: true });
+  const pegMaterial = new THREE.MeshStandardMaterial({ color: "#4a2f20", roughness: 0.96, flatShading: true });
+
+  for (let plank = 0; plank < 5; plank += 1) {
+    const board = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.11, 1.42), plankMaterial);
+    board.position.set((plank - 2) * 0.34, 0.08 + (plank % 2) * 0.014, 0);
+    board.rotation.z = (plank - 2) * 0.018;
+    board.castShadow = true;
+    board.receiveShadow = true;
+    group.add(board);
+  }
+
+  [-0.88, 0.88].forEach((x) => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.72), ropeMaterial);
+    rail.position.set(x, 0.22, 0);
+    rail.castShadow = true;
+    group.add(rail);
+  });
+
+  [-0.72, 0.72].forEach((x) => {
+    [-0.62, 0.62].forEach((z) => {
+      const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.36, 6), pegMaterial);
+      peg.position.set(x, 0.18, z);
+      peg.castShadow = true;
+      group.add(peg);
+    });
+  });
+
+  return group;
+}
+
 function createBuildPreview(): THREE.Group {
   const group = new THREE.Group();
   group.name = "BuildPreview";
@@ -1541,7 +1586,19 @@ function createBuildPreview(): THREE.Group {
   flame.position.y = 0.42;
   campfire.add(fireRing, flame);
 
-  group.add(cabin, campfire);
+  const bridge = new THREE.Group();
+  bridge.name = "PreviewBridge";
+  const bridgeRing = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.05, 5), ringMaterial);
+  bridgeRing.rotation.x = -Math.PI / 2;
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.16, 1.0), material);
+  plank.position.y = 0.12;
+  const railLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.24), material);
+  railLeft.position.set(-0.86, 0.26, 0);
+  const railRight = railLeft.clone();
+  railRight.position.x = 0.86;
+  bridge.add(bridgeRing, plank, railLeft, railRight);
+
+  group.add(cabin, campfire, bridge);
   return group;
 }
 

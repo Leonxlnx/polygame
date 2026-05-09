@@ -85,7 +85,8 @@ export function createHud(root: HTMLElement): Hud {
       setSlot(buildSlot, buildUnlocked, buildUnlocked, state.ui.selectedSlot === "build");
       setSlot(attackSlot, attackUnlocked, attackUnlocked, state.ui.selectedSlot === "attack");
       setSlot(packSlot, packUnlocked, packUnlocked, state.ui.selectedSlot === "pack");
-      buildSlot.querySelector("strong")!.textContent = state.quest.tutorialStage === "buildCampfire" ? "Fire" : "Build";
+      toolSlot.querySelector("strong")!.textContent = state.quest.axeCrafted ? "Axe" : state.quest.pickaxeCrafted ? "Pick" : "Tool";
+      buildSlot.querySelector("strong")!.textContent = state.quest.tutorialStage === "buildCampfire" ? "Fire" : state.quest.tutorialStage === "repairBridge" ? "Bridge" : "Build";
       hotbar.classList.toggle("is-hidden", state.quest.tutorialStage === "wakeInCove");
 
       interactPrompt.textContent = state.action.prompt;
@@ -155,6 +156,12 @@ function stageRank(stage: TutorialStage): number {
     "gatherHerbs",
     "returnHerbs",
     "buildCampfire",
+    "craftAxe",
+    "fellTree",
+    "returnTree",
+    "repairBridge",
+    "clearGuardian",
+    "returnGuardian",
     "firstCampReady",
   ];
   return order.indexOf(stage);
@@ -184,6 +191,15 @@ function chapterLabel(stage: TutorialStage): string {
     case "returnHerbs":
     case "buildCampfire":
       return "First Fire";
+    case "craftAxe":
+    case "fellTree":
+    case "returnTree":
+      return "First Axe";
+    case "repairBridge":
+      return "Lower Crossing";
+    case "clearGuardian":
+    case "returnGuardian":
+      return "First Guardian";
     case "firstCampReady":
       return "Trail Opens";
   }
