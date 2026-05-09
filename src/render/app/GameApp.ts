@@ -26,6 +26,7 @@ import {
 import { createTileWorld } from "../objects/createTileWorld";
 
 type GamePhase = "menu" | "loading" | "characterSelect" | "playing";
+type LoadingTarget = "characterSelect" | "playing";
 
 type GameUi = {
   mainMenu: HTMLElement;
@@ -133,6 +134,12 @@ const loadingLines = [
   "Warming the valley light.",
 ] as const;
 
+const worldLoadingLines = [
+  "Opening the morning cove.",
+  "Clearing the ridge path.",
+  "Calling Edda to camp.",
+] as const;
+
 export class GameApp {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
@@ -199,6 +206,7 @@ export class GameApp {
   private cameraZoomPreference = 1;
   private processedHarvestEvents = 0;
   private loadingElapsed = 0;
+  private loadingTarget: LoadingTarget = "characterSelect";
   private loadingTimeout?: number;
   private loadingProgressTimeout?: number;
   private resizeObserver?: ResizeObserver;
@@ -243,7 +251,7 @@ export class GameApp {
     this.bindUi();
     this.handleResize();
     if (options.quickStart) {
-      this.startSelectedCharacter();
+      this.enterSelectedCharacter();
     } else if (options.initialPhase === "characterSelect") {
       this.phase = "characterSelect";
       this.previewRoot.visible = true;
@@ -346,15 +354,21 @@ export class GameApp {
   private readonly beginLoading = (): void => {
     this.audio.unlock();
     this.audio.playStart();
+    this.startLoading("characterSelect");
+  };
+
+  private startLoading(target: LoadingTarget): void {
+    this.loadingTarget = target;
     this.phase = "loading";
     this.loadingElapsed = 0;
+    const lines = target === "playing" ? worldLoadingLines : loadingLines;
     this.ui.loadingProgress.style.width = "0%";
-    this.ui.loadingCopy.textContent = loadingLines[0];
+    this.ui.loadingCopy.textContent = lines[0];
     this.clearLoadingTimers();
     this.loadingProgressTimeout = window.setTimeout(() => {
       if (this.phase === "loading") {
         this.ui.loadingProgress.style.width = "100%";
-        this.ui.loadingCopy.textContent = loadingLines[1];
+        this.ui.loadingCopy.textContent = lines[1];
       }
     }, 30);
     this.loadingTimeout = window.setTimeout(() => {
@@ -363,7 +377,7 @@ export class GameApp {
       }
     }, 1250);
     this.syncUi();
-  };
+  }
 
   private readonly selectPreviousCharacter = (): void => {
     this.audio.unlock();
@@ -404,6 +418,10 @@ export class GameApp {
   private readonly startSelectedCharacter = (): void => {
     this.audio.unlock();
     this.audio.playStart();
+    this.startLoading("playing");
+  };
+
+  private enterSelectedCharacter(): void {
     const selected = characterPresets[this.selectedCharacterIndex];
     this.replacePlayableCharacter(selected.id, this.selectedColorId());
     const spawn = this.debugSpawn ?? this.state.player.spawn;
@@ -447,7 +465,7 @@ export class GameApp {
     this.syncUi();
     this.syncDialogue(0);
     this.hud.update(this.state);
-  };
+  }
 
   private readonly tick = (): void => {
     const deltaSeconds = Math.min(this.clock.getDelta(), 1 / 30);
@@ -485,7 +503,8 @@ export class GameApp {
 
   private updateLoading(deltaSeconds: number): void {
     this.loadingElapsed += deltaSeconds;
-    const progress = THREE.MathUtils.clamp(this.loadingElapsed / 1.25, 0, 1);
+    const duration = this.loadingTarget === "playing" ? 1.05 : 1.25;
+    const progress = THREE.MathUtils.clamp(this.loadingElapsed / duration, 0, 1);
     this.ui.loadingProgress.style.width = `${Math.round(progress * 100)}%`;
 
     if (progress >= 1) {
@@ -495,6 +514,11 @@ export class GameApp {
 
   private completeLoading(): void {
     this.clearLoadingTimers();
+    if (this.loadingTarget === "playing") {
+      this.enterSelectedCharacter();
+      return;
+    }
+
     this.phase = "characterSelect";
     this.previewRoot.visible = true;
     this.syncCharacterPanel();
