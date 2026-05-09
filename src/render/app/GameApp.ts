@@ -113,6 +113,11 @@ type StaminaBarView = {
   fill: THREE.Mesh;
 };
 
+type HarvestFocusView = {
+  root: THREE.Group;
+  chips: THREE.Mesh[];
+};
+
 type DialogueState = {
   active: boolean;
   speaker: string;
@@ -151,6 +156,7 @@ export class GameApp {
   private readonly stepRoot = new THREE.Group();
   private readonly resourceFlyRoot = document.createElement("div");
   private readonly staminaBar = createStaminaBar();
+  private readonly harvestFocus = createHarvestFocus();
   private readonly buildPreview = createBuildPreview();
   private readonly hiddenPropIds = new Set<string>();
   private readonly harvestEffects: HarvestEffectView[] = [];
@@ -213,6 +219,8 @@ export class GameApp {
     this.enemyRoot.name = "Enemies";
     this.buildingRoot.name = "PlayerBuildings";
     this.stepRoot.name = "StepDust";
+    this.harvestFocus.root.visible = false;
+    this.harvestRoot.add(this.harvestFocus.root);
     this.attackArc.visible = false;
     this.buildPreview.visible = false;
 
@@ -580,6 +588,7 @@ export class GameApp {
   private syncWorldActors(deltaSeconds: number): void {
     this.syncGuideNpc(deltaSeconds);
     this.syncStepDust(deltaSeconds);
+    this.syncHarvestFocus(deltaSeconds);
     this.syncHarvestedProps(deltaSeconds);
     this.syncResourceFly(deltaSeconds);
     this.syncEnemies(deltaSeconds);
@@ -609,11 +618,35 @@ export class GameApp {
     }
   }
 
+  private syncHarvestFocus(deltaSeconds: number): void {
+    const nodeId = this.state.action.harvestingNodeId;
+    const node = nodeId ? this.state.world.resourceNodes.find((item) => item.id === nodeId && item.active) : undefined;
+
+    if (!node || this.state.action.harvestingDuration <= 0) {
+      this.harvestFocus.root.visible = false;
+      return;
+    }
+
+    const progress = THREE.MathUtils.clamp(1 - this.state.action.harvestingTimer / this.state.action.harvestingDuration, 0, 1);
+    const groundY = terrainHeight(node.x, node.z);
+    const pulse = 1 + Math.sin(this.clock.elapsedTime * 8.5) * 0.035;
+    this.harvestFocus.root.visible = true;
+    this.harvestFocus.root.position.set(node.x, groundY + 0.075, node.z);
+    this.harvestFocus.root.rotation.y += deltaSeconds * (1.1 + progress * 0.8);
+    this.harvestFocus.root.scale.setScalar((0.78 + progress * 0.22) * pulse);
+    this.harvestFocus.chips.forEach((chip, index) => {
+      const threshold = (index + 1) / this.harvestFocus.chips.length;
+      chip.visible = progress + 0.02 >= threshold;
+      chip.scale.y = chip.visible ? THREE.MathUtils.lerp(0.65, 1.18, progress) : 0.65;
+    });
+  }
+
   private syncHarvestedProps(deltaSeconds: number): void {
     const events = this.state.action.harvestEvents;
     while (this.processedHarvestEvents < events.length) {
       const event = events[this.processedHarvestEvents];
       this.processedHarvestEvents += 1;
+      this.playHarvestFeedback(event);
       if (event.final) {
         this.hiddenPropIds.add(event.nodeId);
         this.spawnResourceFly(event);
@@ -656,6 +689,20 @@ export class GameApp {
         this.harvestEffects.splice(index, 1);
       }
     }
+  }
+
+  private playHarvestFeedback(event: HarvestEvent): void {
+    if (event.kind === "rock" || event.kind === "ore" || event.kind === "boulder" || event.kind === "crystal") {
+      this.audio.playAttack();
+      return;
+    }
+
+    if (event.kind === "log" || event.kind === "stump" || event.kind === "pine" || event.kind === "oak" || event.kind === "birch" || event.kind === "willow") {
+      this.audio.playBuild();
+      return;
+    }
+
+    this.audio.playGather();
   }
 
   private spawnResourceFly(event: HarvestEvent): void {
@@ -1519,6 +1566,32 @@ function createStaminaBar(): StaminaBarView {
 
   root.add(rim, back, fill);
   return { root, fill };
+}
+
+function createHarvestFocus(): HarvestFocusView {
+  const root = new THREE.Group();
+  root.name = "HarvestFocus";
+  const baseMaterial = new THREE.MeshBasicMaterial({ color: "#171f18", transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
+  const chipMaterial = new THREE.MeshBasicMaterial({ color: "#f0d47d", transparent: true, opacity: 0.86, depthWrite: false });
+  const base = new THREE.Mesh(new THREE.RingGeometry(0.58, 0.64, 18), baseMaterial);
+  base.name = "HarvestFocusBase";
+  base.rotation.x = -Math.PI / 2;
+  root.add(base);
+
+  const chipGeometry = new THREE.BoxGeometry(0.08, 0.025, 0.22);
+  const chips: THREE.Mesh[] = [];
+  for (let index = 0; index < 12; index += 1) {
+    const angle = (index / 12) * Math.PI * 2;
+    const chip = new THREE.Mesh(chipGeometry, chipMaterial);
+    chip.name = `HarvestFocusChip${index + 1}`;
+    chip.position.set(Math.sin(angle) * 0.62, 0.018, Math.cos(angle) * 0.62);
+    chip.rotation.y = angle;
+    chip.visible = false;
+    chips.push(chip);
+    root.add(chip);
+  }
+
+  return { root, chips };
 }
 
 function createStepDustView(x: number, z: number, yaw: number, y: number): StepDustView {
