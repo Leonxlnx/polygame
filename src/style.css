@@ -368,6 +368,63 @@ body {
   text-align: center;
 }
 
+.harvest-progress {
+  position: absolute;
+  left: 50%;
+  bottom: 136px;
+  width: min(320px, calc(100vw - 40px));
+  padding: 10px 12px 11px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(248 232 173 / 30%);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%)),
+    rgb(13 18 16 / 76%);
+  box-shadow:
+    0 14px 32px rgb(0 0 0 / 30%),
+    inset 0 1px 0 rgb(255 255 255 / 6%);
+}
+
+.harvest-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--ui-ink);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.harvest-progress-top span {
+  color: #f5e6ad;
+  text-transform: uppercase;
+}
+
+.harvest-progress-top strong {
+  color: #e9f2e2;
+  font-variant-numeric: tabular-nums;
+}
+
+.harvest-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  background: rgb(4 7 6 / 42%);
+}
+
+.harvest-progress-track i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d7bd74, #f2e2a3);
+  box-shadow: 0 0 14px rgb(248 232 173 / 28%);
+  transition: width 90ms linear;
+}
+
 .toast {
   position: absolute;
   top: 68px;
@@ -531,6 +588,12 @@ body {
   padding: 4px 74px 2px 0;
 }
 
+.dialogue-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .dialogue-speaker {
   display: inline-flex;
   min-height: 25px;
@@ -542,6 +605,14 @@ body {
   font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.dialogue-progress {
+  color: rgb(226 207 150 / 64%);
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 .dialogue-panel p {
@@ -597,6 +668,10 @@ body {
     border-color 160ms ease,
     transform 160ms ease,
     opacity 160ms ease;
+}
+
+.slot.is-hidden {
+  display: none;
 }
 
 .slot.is-ready {
@@ -727,6 +802,7 @@ body {
 .chapter-card.is-hidden,
 .toast.is-hidden,
 .interact-prompt.is-hidden,
+.harvest-progress.is-hidden,
 .inventory-panel.is-hidden,
 .hotbar.is-hidden {
   display: none;

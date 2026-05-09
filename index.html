@@ -39,6 +39,13 @@
           <div class="build-note">Tools unlock through the trail tutorial.</div>
         </div>
         <div id="interact-prompt" class="interact-prompt is-hidden"></div>
+        <div id="harvest-progress" class="harvest-progress is-hidden" aria-live="polite">
+          <div class="harvest-progress-top">
+            <span id="harvest-label">Working</span>
+            <strong id="harvest-percent">0%</strong>
+          </div>
+          <div class="harvest-progress-track"><i id="harvest-fill"></i></div>
+        </div>
         <div id="toast" class="toast is-hidden"></div>
         <div id="chapter-card" class="chapter-card is-hidden" aria-live="polite">
           <span id="chapter-card-title">Chapter 1</span>
@@ -54,7 +61,10 @@
             <span class="portrait-shoulders"></span>
           </div>
           <div class="dialogue-body">
-            <div id="dialogue-speaker" class="dialogue-speaker">Edda</div>
+            <div class="dialogue-header">
+              <div id="dialogue-speaker" class="dialogue-speaker">Edda</div>
+              <span id="dialogue-progress" class="dialogue-progress">1 / 1</span>
+            </div>
             <p id="dialogue-text"></p>
             <span id="dialogue-continue" class="dialogue-continue">Click</span>
           </div>

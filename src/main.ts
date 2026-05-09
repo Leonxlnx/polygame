@@ -22,6 +22,7 @@ const prevColor = document.querySelector<HTMLButtonElement>("#prev-color");
 const nextColor = document.querySelector<HTMLButtonElement>("#next-color");
 const dialoguePanel = document.querySelector<HTMLElement>("#dialogue-panel");
 const dialogueSpeaker = document.querySelector<HTMLElement>("#dialogue-speaker");
+const dialogueProgress = document.querySelector<HTMLElement>("#dialogue-progress");
 const dialogueText = document.querySelector<HTMLElement>("#dialogue-text");
 const dialogueContinue = document.querySelector<HTMLElement>("#dialogue-continue");
 const settingsButton = document.querySelector<HTMLButtonElement>("#settings-button");
@@ -53,6 +54,7 @@ if (
   !nextColor ||
   !dialoguePanel ||
   !dialogueSpeaker ||
+  !dialogueProgress ||
   !dialogueText ||
   !dialogueContinue ||
   !settingsButton ||
@@ -103,6 +105,7 @@ const app = new GameApp({
     nextColor,
     dialoguePanel,
     dialogueSpeaker,
+    dialogueProgress,
     dialogueText,
     dialogueContinue,
     settingsButton,

@@ -29,6 +29,10 @@ export function createHud(root: HTMLElement): Hud {
   const inventoryPanel = requireElement(root, "#inventory-panel");
   const inventorySummary = requireElement(root, "#inventory-summary");
   const interactPrompt = requireElement(root, "#interact-prompt");
+  const harvestProgress = requireElement(root, "#harvest-progress");
+  const harvestLabel = requireElement(root, "#harvest-label");
+  const harvestPercent = requireElement(root, "#harvest-percent");
+  const harvestFill = requireElement(root, "#harvest-fill");
   const toast = requireElement(root, "#toast");
   const chapterCard = requireElement(root, "#chapter-card");
   const chapterCardTitle = requireElement(root, "#chapter-card-title");
@@ -86,6 +90,7 @@ export function createHud(root: HTMLElement): Hud {
 
       interactPrompt.textContent = state.action.prompt;
       interactPrompt.classList.toggle("is-hidden", state.action.prompt.length === 0);
+      syncHarvestProgress(state, harvestProgress, harvestLabel, harvestPercent, harvestFill);
 
       toast.textContent = state.action.message;
       toast.classList.toggle("is-hidden", state.action.message.length === 0 || state.action.messageTimer <= 0);
@@ -105,10 +110,30 @@ function requireElement(root: HTMLElement, selector: string): HTMLElement {
 }
 
 function setSlot(slot: HTMLElement, unlocked: boolean, ready: boolean, selected: boolean): void {
+  slot.classList.toggle("is-hidden", !unlocked);
   slot.classList.toggle("is-unlocked", unlocked);
   slot.classList.toggle("is-ready", unlocked && ready);
   slot.classList.toggle("is-locked", !ready);
   slot.classList.toggle("is-selected", selected && unlocked);
+}
+
+function syncHarvestProgress(
+  state: GameState,
+  panel: HTMLElement,
+  label: HTMLElement,
+  percent: HTMLElement,
+  fill: HTMLElement,
+): void {
+  const active = state.action.harvestingNodeId.length > 0 && state.action.harvestingDuration > 0;
+  panel.classList.toggle("is-hidden", !active);
+  if (!active) return;
+
+  const node = state.world.resourceNodes.find((item) => item.id === state.action.harvestingNodeId);
+  const progress = 1 - state.action.harvestingTimer / state.action.harvestingDuration;
+  const clamped = Math.max(0, Math.min(1, progress));
+  label.textContent = node?.actionLabel ?? "Working";
+  percent.textContent = `${Math.round(clamped * 100)}%`;
+  fill.style.width = `${Math.round(clamped * 100)}%`;
 }
 
 function isAtLeast(current: TutorialStage, target: TutorialStage): boolean {

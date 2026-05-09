@@ -47,6 +47,7 @@ type GameUi = {
   nextColor: HTMLButtonElement;
   dialoguePanel: HTMLElement;
   dialogueSpeaker: HTMLElement;
+  dialogueProgress: HTMLElement;
   dialogueText: HTMLElement;
   dialogueContinue: HTMLElement;
   settingsButton: HTMLButtonElement;
@@ -867,6 +868,7 @@ export class GameApp {
     const visibleLength = Math.floor(this.dialogueState.visibleCharacters);
     this.dialogueState.lineComplete = visibleLength >= line.length;
     this.ui.dialogueSpeaker.textContent = this.dialogueState.speaker;
+    this.ui.dialogueProgress.textContent = `${String(this.dialogueState.lineIndex + 1).padStart(2, "0")} / ${String(this.dialogueState.lines.length).padStart(2, "0")}`;
     this.ui.dialogueText.textContent = line.slice(0, visibleLength);
     this.ui.dialogueContinue.textContent = this.dialogueState.lineComplete ? "Click" : "";
     this.ui.dialoguePanel.classList.toggle("is-complete", this.dialogueState.lineComplete);
