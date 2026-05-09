@@ -123,7 +123,7 @@ function createBaseGround(size: number): { mesh: THREE.Mesh; dispose: () => void
 }
 
 function createGrassFloor(size: number): { mesh: THREE.Mesh; dispose: () => void } {
-  const cellSize = 0.58;
+  const cellSize = size > 900 ? 2.18 : 0.58;
   const half = size / 2;
   const columns = Math.ceil(size / cellSize);
   const rows = Math.ceil(size / cellSize);
@@ -182,8 +182,9 @@ function createBiomeGroundDetails(size: number): { mesh: THREE.Mesh; dispose: ()
   const half = size / 2;
   const positions: number[] = [];
   const colors: number[] = [];
+  const detailCount = size > 900 ? 520 : 150;
 
-  for (let index = 0; index < 150; index += 1) {
+  for (let index = 0; index < detailCount; index += 1) {
     const x = -half + valueNoise(index * 17, 701) * size;
     const z = -half + valueNoise(index * 19, 709) * size;
     const biome = biomeAt(x, z);

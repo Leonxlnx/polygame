@@ -755,12 +755,19 @@ function showMessage(state: GameState, message: string): void {
 
 function resolveWorldCollisions(state: GameState): void {
   state.world.colliders.forEach((collider) => {
+    if (collider.propId && isInactivePropCollider(state, collider.propId)) return;
+
     if (collider.type === "circle") {
       resolveCircleCollision(state, collider);
     } else {
       resolveCapsuleCollision(state, collider);
     }
   });
+}
+
+function isInactivePropCollider(state: GameState, propId: string): boolean {
+  const node = state.world.resourceNodes.find((item) => item.id === propId);
+  return node ? !node.active : false;
 }
 
 function resolveCircleCollision(state: GameState, collider: Extract<WorldCollider, { type: "circle" }>): void {

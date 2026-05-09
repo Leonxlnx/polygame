@@ -53,6 +53,7 @@ export type WorldCollider = {
   x: number;
   z: number;
   radius: number;
+  propId?: string;
 } | {
   type: "capsule";
   x: number;
@@ -60,6 +61,7 @@ export type WorldCollider = {
   radius: number;
   halfLength: number;
   rotation: number;
+  propId?: string;
 };
 
 const OPENING_ROUTE_START_Z = OPENING_PATH_START_Z - 0.8;
@@ -67,7 +69,7 @@ const OPENING_ROUTE_END_Z = -7;
 
 export const worldProps: WorldProp[] = createWorldProps();
 
-export const worldColliders: WorldCollider[] = worldProps.flatMap(createCollidersForProp);
+export const worldColliders: WorldCollider[] = worldProps.flatMap((prop, index) => createCollidersForProp(prop, `${prop.kind}-${index}`));
 
 function createWorldProps(): WorldProp[] {
   const props: WorldProp[] = [];
@@ -80,6 +82,7 @@ function createWorldProps(): WorldProp[] {
   addBiomeLandmarks(props);
   addFlowerClusters(props);
   addBiomeClusters(props);
+  addWildlandProps(props);
 
   for (let cluster = 0; cluster < 17; cluster += 1) {
     const z = -88 + cluster * 10.2 + (valueNoise(cluster, 3) - 0.5) * 5;
@@ -126,6 +129,45 @@ function createWorldProps(): WorldProp[] {
   }
 
   return props.filter((prop) => !shouldCullFromOpeningRoute(prop));
+}
+
+function addWildlandProps(props: WorldProp[]): void {
+  const half = WORLD_SIZE / 2;
+  const clusterCount = 88;
+
+  for (let cluster = 0; cluster < clusterCount; cluster += 1) {
+    const z = -half + 42 + valueNoise(cluster * 17, 1401) * (WORLD_SIZE - 84);
+    const side = valueNoise(cluster, 1407) > 0.5 ? 1 : -1;
+    const edge = pathWidthAt(z) * 0.5;
+    const distance = edge + 10 + valueNoise(cluster, 1411) * 56;
+    const centerX = pathCenterX(z) + side * distance + (valueNoise(cluster, 1417) - 0.5) * 12;
+    const biome = biomeAt(centerX, z);
+
+    if (Math.abs(centerX) > half - 18 || Math.abs(z) > half - 18) continue;
+    if (Math.hypot(centerX - pathCenterX(z), z - OPENING_PATH_START_Z) < 28) continue;
+
+    if (biome === "pineForest") {
+      addCluster(props, "pine", centerX, z, cluster * 310 + 15100, 3, 4.6, 1.0, 1.72);
+      addCluster(props, "fern", centerX + side * 2.2, z + 1.4, cluster * 310 + 15200, 5, 2.8, 0.7, 1.18);
+      continue;
+    }
+
+    if (biome === "highland") {
+      addCluster(props, "boulder", centerX, z, cluster * 310 + 15300, 2, 3.8, 0.86, 1.52);
+      addCluster(props, "rock", centerX - side * 2.6, z - 1.1, cluster * 310 + 15400, 4, 2.4, 0.48, 1.04);
+      if (cluster % 5 === 0) addCluster(props, "crystal", centerX + side * 2.3, z + 1.8, cluster * 310 + 15500, 2, 1.2, 0.68, 1.06);
+      continue;
+    }
+
+    if (biome === "wetland") {
+      addCluster(props, "reed", centerX, z, cluster * 310 + 15600, 8, 3.4, 0.7, 1.22);
+      if (cluster % 4 === 0) addCluster(props, "willow", centerX - side * 2.8, z + 1.6, cluster * 310 + 15700, 1, 0.8, 0.96, 1.36);
+      continue;
+    }
+
+    addCluster(props, cluster % 3 === 0 ? "birch" : "oak", centerX, z, cluster * 310 + 15800, 2 + Math.floor(valueNoise(cluster, 15801) * 3), 4.2, 0.82, 1.44);
+    addCluster(props, "flower", centerX + side * 1.8, z - 0.8, cluster * 310 + 15900, 4, 1.4, 0.72, 1.12);
+  }
 }
 
 function shouldCullFromOpeningRoute(prop: WorldProp): boolean {
@@ -571,9 +613,13 @@ function radiusForKind(kind: WorldPropKind): number {
   return baseRadius[kind];
 }
 
-function createCollidersForProp(prop: WorldProp): WorldCollider[] {
+function createCollidersForProp(prop: WorldProp, propId: string): WorldCollider[] {
   if (!prop.collides) return [];
 
+  return createRawCollidersForProp(prop).map((collider) => ({ ...collider, propId }));
+}
+
+function createRawCollidersForProp(prop: WorldProp): WorldCollider[] {
   switch (prop.kind) {
     case "pine":
       return [makeCircleCollider(prop, 0.28)];

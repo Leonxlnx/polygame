@@ -1,4 +1,4 @@
-export const WORLD_SIZE = 320;
+export const WORLD_SIZE = 1440;
 export const OPENING_PATH_START_Z = -38.35;
 
 export type BiomeId = "village" | "meadow" | "pineForest" | "highland" | "wetland";
