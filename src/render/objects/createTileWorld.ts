@@ -1,0 +1,975 @@
+import * as THREE from "three";
+import { biomeAt, fbm, OPENING_PATH_START_Z, pathCenterX, pathWidthAt, smoothNoise, terrainHeight, valueNoise, WORLD_SIZE, type BiomeId } from "../../game/content/worldMap";
+import { worldProps } from "../../game/content/worldProps";
+import { createWorldPropObjects } from "./createWorldPropObjects";
+
+type TileWorld = {
+  root: THREE.Group;
+  setHiddenPropIds: (hiddenPropIds: ReadonlySet<string>) => void;
+  dispose: () => void;
+};
+
+type Point = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+type WaterPatchSpec = {
+  x: number;
+  z: number;
+  rx: number;
+  rz: number;
+  rotation: number;
+  seed: number;
+};
+
+type BranchPathSpec = {
+  startZ: number;
+  endX: number;
+  endZ: number;
+  width: number;
+  bend: number;
+  seed: number;
+};
+
+const grassPalettes: Record<BiomeId, string[]> = {
+  village: ["#5d7644", "#657f4b", "#6b8551", "#718b57", "#58713f", "#637c49"],
+  meadow: ["#667f47", "#6f8950", "#769058", "#7c965e", "#5e783f", "#6c864d"],
+  pineForest: ["#435f36", "#4a673b", "#506e40", "#557445", "#3f5a32", "#4c6a3d"],
+  highland: ["#6d7855", "#747f5d", "#7c8765", "#68734f", "#83886a", "#717b5a"],
+  wetland: ["#506e55", "#587860", "#607f67", "#657f5d", "#4c6750", "#668168"],
+};
+const pathPalette = ["#aa986e", "#b09f77", "#b6a77f", "#baa982", "#c0b088", "#ad9c73"];
+const waterPatches: WaterPatchSpec[] = [
+  { x: -78, z: 58, rx: 6.9, rz: 3.6, rotation: -0.35, seed: 11 },
+  { x: -96, z: 94, rx: 8.2, rz: 4.0, rotation: 0.22, seed: 23 },
+  { x: -58, z: 124, rx: 7.2, rz: 3.8, rotation: 0.58, seed: 37 },
+  { x: -118, z: 142, rx: 5.4, rz: 2.8, rotation: -0.62, seed: 41 },
+];
+const branchPaths: BranchPathSpec[] = [
+  { startZ: 30, endX: -82, endZ: 72, width: 2.95, bend: -10.5, seed: 301 },
+  { startZ: 45, endX: 76, endZ: 60, width: 2.85, bend: 8.8, seed: 401 },
+];
+
+export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
+  const root = new THREE.Group();
+  root.name = "LowPolyWorld";
+
+  const base = createBaseGround(worldSize);
+  const grass = createGrassFloor(worldSize);
+  const biomeDetails = createBiomeGroundDetails(worldSize);
+  const path = createPathMosaic(worldSize);
+  const branches = createBranchPathMosaics();
+  const edgeBlend = createPathEdgeBlend(worldSize);
+  const shorelines = createWaterShorelines();
+  const water = createWaterPatches();
+  let props = createWorldPropObjects(worldProps);
+  let hiddenSignature = "";
+
+  root.add(base.mesh, grass.mesh, biomeDetails.mesh, path.mesh, branches.mesh, edgeBlend.mesh, shorelines.mesh, water.root, props.root);
+
+  return {
+    root,
+    setHiddenPropIds: (hiddenPropIds) => {
+      const nextSignature = Array.from(hiddenPropIds).sort().join("|");
+      if (nextSignature === hiddenSignature) return;
+
+      hiddenSignature = nextSignature;
+      root.remove(props.root);
+      props.dispose();
+      props = createWorldPropObjects(worldProps.filter((prop, index) => !hiddenPropIds.has(propId(prop, index))));
+      root.add(props.root);
+    },
+    dispose: () => {
+      base.dispose();
+      grass.dispose();
+      biomeDetails.dispose();
+      path.dispose();
+      branches.dispose();
+      edgeBlend.dispose();
+      shorelines.dispose();
+      water.dispose();
+      props.dispose();
+    },
+  };
+}
+
+function propId(prop: { kind: string }, index: number): string {
+  return `${prop.kind}-${index}`;
+}
+
+function createBaseGround(size: number): { mesh: THREE.Mesh; dispose: () => void } {
+  const geometry = new THREE.PlaneGeometry(size * 4, size * 4);
+  const material = new THREE.MeshStandardMaterial({
+    color: "#5f843d",
+    roughness: 1,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "BaseGround";
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = -0.22;
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createGrassFloor(size: number): { mesh: THREE.Mesh; dispose: () => void } {
+  const cellSize = 0.58;
+  const half = size / 2;
+  const columns = Math.ceil(size / cellSize);
+  const rows = Math.ceil(size / cellSize);
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  for (let gx = 0; gx < columns; gx += 1) {
+    for (let gz = 0; gz < rows; gz += 1) {
+      const x0 = -half + gx * cellSize;
+      const z0 = -half + gz * cellSize;
+      const x1 = x0 + cellSize;
+      const z1 = z0 + cellSize;
+
+      const a = makeJitteredPoint(x0, z0, gx, gz);
+      const b = makeJitteredPoint(x1, z0, gx + 1, gz);
+      const c = makeJitteredPoint(x1, z1, gx + 1, gz + 1);
+      const d = makeJitteredPoint(x0, z1, gx, gz + 1);
+      const splitForward = valueNoise(gx, gz) > 0.5;
+
+      if (splitForward) {
+        addGrassTriangle(positions, colors, a, b, c);
+        addGrassTriangle(positions, colors, a, c, d);
+      } else {
+        addGrassTriangle(positions, colors, a, b, d);
+        addGrassTriangle(positions, colors, b, c, d);
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.98,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "IrregularLowPolyGrass";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createBiomeGroundDetails(size: number): { mesh: THREE.Mesh; dispose: () => void } {
+  const half = size / 2;
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  for (let index = 0; index < 150; index += 1) {
+    const x = -half + valueNoise(index * 17, 701) * size;
+    const z = -half + valueNoise(index * 19, 709) * size;
+    const biome = biomeAt(x, z);
+    const pathDistance = Math.abs(x - pathCenterX(z));
+    if (pathDistance < pathWidthAt(z) * 0.7) continue;
+
+    if (biome === "highland") {
+      addGroundPatch(
+        positions,
+        colors,
+        x,
+        z,
+        1.4 + valueNoise(index, 719) * 2.8,
+        0.5 + valueNoise(index, 727) * 1.2,
+        valueNoise(index, 733) * Math.PI,
+        ["#7f8564", "#687653", "#8a8a6b"],
+        0.094,
+        index,
+      );
+    } else if (biome === "pineForest" && index % 2 === 0) {
+      addGroundPatch(
+        positions,
+        colors,
+        x,
+        z,
+        1.1 + valueNoise(index, 739) * 1.9,
+        0.46 + valueNoise(index, 743) * 0.86,
+        valueNoise(index, 751) * Math.PI,
+        ["#3d5634", "#47633b", "#526d40"],
+        0.092,
+        index,
+      );
+    } else if (biome === "wetland" && index % 3 !== 0) {
+      addGroundPatch(
+        positions,
+        colors,
+        x,
+        z,
+        0.9 + valueNoise(index, 757) * 1.8,
+        0.44 + valueNoise(index, 761) * 0.9,
+        valueNoise(index, 769) * Math.PI,
+        ["#5b755a", "#657e61", "#706f55"],
+        0.093,
+        index,
+      );
+    } else if (biome === "meadow" && index % 4 === 1) {
+      addGroundPatch(
+        positions,
+        colors,
+        x,
+        z,
+        0.8 + valueNoise(index, 773) * 1.5,
+        0.4 + valueNoise(index, 787) * 0.8,
+        valueNoise(index, 797) * Math.PI,
+        ["#789257", "#6c884c", "#839b61"],
+        0.091,
+        index,
+      );
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.98,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -0.5,
+    polygonOffsetUnits: -0.5,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "BiomeGroundDetailPatches";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createPathMosaic(size: number): { mesh: THREE.Mesh; dispose: () => void } {
+  const half = size / 2;
+  const step = 0.5;
+  const rows = Math.ceil(size / step);
+  const columns = 10;
+  const points: Point[][] = [];
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  for (let row = 0; row <= rows; row += 1) {
+    points[row] = [];
+    const rowBaseZ = -half + row * step;
+    const rowJitter = row === 0 || row === rows ? 0 : (smoothNoise(row * 0.31, 311) - 0.5) * 0.08;
+    const z = rowBaseZ + rowJitter;
+    const leftEdge = pathEdgeX(z, row, -1);
+    const rightEdge = pathEdgeX(z, row, 1);
+
+    for (let column = 0; column <= columns; column += 1) {
+      const edge = column === 0 || column === columns;
+      const baseU = column / columns;
+      const uJitter = edge ? 0 : (valueNoise(row * 53, column * 97) - 0.5) * 0.045;
+      const u = THREE.MathUtils.clamp(baseU + uJitter, 0.035, 0.965);
+      const x = THREE.MathUtils.lerp(leftEdge, rightEdge, u);
+
+      points[row][column] = {
+        x,
+        y: terrainHeight(x, z) + 0.086,
+        z,
+      };
+    }
+  }
+
+  for (let row = 0; row < rows; row += 1) {
+    const midZ = (points[row][0].z + points[row + 1][0].z) * 0.5;
+    if (midZ < OPENING_PATH_START_Z) continue;
+
+    for (let column = 0; column < columns; column += 1) {
+      const a = points[row][column];
+      const b = points[row + 1][column];
+      const c = points[row + 1][column + 1];
+      const d = points[row][column + 1];
+      const seed = row * 9973 + column * 7919;
+      const type = valueNoise(seed, 43);
+
+      if (type < 0.62) {
+        addPathQuad(positions, colors, a, b, c, d, seed);
+      } else if (type < 0.82) {
+        addPathTriangle(positions, colors, a, b, c, seed);
+        addPathTriangle(positions, colors, a, c, d, seed + 1);
+      } else if (type < 0.97) {
+        addPathTriangle(positions, colors, a, b, d, seed);
+        addPathTriangle(positions, colors, b, c, d, seed + 1);
+      } else {
+        addPathFan(positions, colors, a, b, c, d, seed);
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.92,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "VillagePathMosaic";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createBranchPathMosaics(): { mesh: THREE.Mesh; dispose: () => void } {
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  branchPaths.forEach((branch) => {
+    const start = { x: pathCenterX(branch.startZ), z: branch.startZ };
+    const rows = 66;
+    const columns = 4;
+    const points: Point[][] = [];
+
+    for (let row = 0; row <= rows; row += 1) {
+      points[row] = [];
+      const t = row / rows;
+      const curve = Math.sin(t * Math.PI);
+      const ripple = Math.sin(t * Math.PI * 2 + branch.seed) * 0.7;
+      const centerX = THREE.MathUtils.lerp(start.x, branch.endX, t) + curve * branch.bend + ripple;
+      const centerZ = THREE.MathUtils.lerp(start.z, branch.endZ, t) + Math.sin(t * Math.PI * 1.5 + branch.seed * 0.01) * 1.2;
+      const nextT = Math.min(1, t + 1 / rows);
+      const nextCurve = Math.sin(nextT * Math.PI);
+      const nextX = THREE.MathUtils.lerp(start.x, branch.endX, nextT) + nextCurve * branch.bend;
+      const nextZ = THREE.MathUtils.lerp(start.z, branch.endZ, nextT);
+      const tangentX = nextX - centerX;
+      const tangentZ = nextZ - centerZ;
+      const tangentLength = Math.hypot(tangentX, tangentZ) || 1;
+      const normalX = -tangentZ / tangentLength;
+      const normalZ = tangentX / tangentLength;
+      const localWidth = branch.width * (0.86 + Math.sin(t * Math.PI) * 0.2 + (smoothNoise(row * 0.18, branch.seed) - 0.5) * 0.13);
+
+      for (let column = 0; column <= columns; column += 1) {
+        const edge = column === 0 || column === columns;
+        const baseU = column / columns - 0.5;
+        const u = baseU + (edge ? 0 : (valueNoise(branch.seed + row * 17, column * 31) - 0.5) * 0.06);
+        const edgeNoise = edge ? (valueNoise(branch.seed + row * 29, column + 19) - 0.5) * 0.26 : 0;
+        const offset = u * localWidth + edgeNoise;
+        const x = centerX + normalX * offset;
+        const z = centerZ + normalZ * offset;
+        points[row][column] = {
+          x,
+          y: terrainHeight(x, z) + 0.092,
+          z,
+        };
+      }
+    }
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const a = points[row][column];
+        const b = points[row + 1][column];
+        const c = points[row + 1][column + 1];
+        const d = points[row][column + 1];
+        const seed = branch.seed * 1000 + row * 83 + column * 17;
+
+        if (valueNoise(seed, 31) < 0.72) {
+          addPathTriangle(positions, colors, a, b, c, seed);
+          addPathTriangle(positions, colors, a, c, d, seed + 1);
+        } else {
+          addPathFan(positions, colors, a, b, c, d, seed);
+        }
+      }
+    }
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.94,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -0.75,
+    polygonOffsetUnits: -0.75,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "BranchPathMosaics";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createPathEdgeBlend(size: number): { mesh: THREE.Mesh; dispose: () => void } {
+  const half = size / 2;
+  const step = 0.68;
+  const rows = Math.ceil(size / step);
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  for (let row = 2; row < rows - 2; row += 1) {
+    const baseZ = -half + row * step;
+    if (baseZ < OPENING_PATH_START_Z - 0.2) continue;
+
+    ([-1, 1] as const).forEach((side) => {
+      const roll = valueNoise(row * 19, side * 47);
+      if (roll < 0.28) return;
+
+      const zCenter = baseZ + (smoothNoise(row * 0.31, side * 11.4) - 0.5) * 0.5;
+      const length = 0.44 + valueNoise(row * 29, side * 61) * 1.45;
+      const depth = 0.16 + valueNoise(row * 31, side * 73) * 0.64;
+      const seed = row * 101 + side * 7;
+      const grassIntoPath = roll < 0.73;
+      const pathRow = Math.round((zCenter + half) / 0.58);
+
+      if (grassIntoPath) {
+        addEdgeBlendQuad(
+          positions,
+          colors,
+          makeTransitionPoint(zCenter - length * 0.5, pathRow, side, 0.1),
+          makeTransitionPoint(zCenter + length * 0.5, pathRow, side, 0.1),
+          makeTransitionPoint(zCenter + length * (0.06 + valueNoise(seed, 1) * 0.34), pathRow, side, -depth * (0.52 + valueNoise(seed, 2) * 0.42)),
+          makeTransitionPoint(zCenter - length * (0.08 + valueNoise(seed, 3) * 0.28), pathRow, side, -depth),
+          seed,
+          true,
+        );
+      } else {
+        addEdgeBlendQuad(
+          positions,
+          colors,
+          makeTransitionPoint(zCenter - length * 0.42, pathRow, side, -0.08),
+          makeTransitionPoint(zCenter + length * 0.42, pathRow, side, -0.14),
+          makeTransitionPoint(zCenter + length * (0.06 + valueNoise(seed, 4) * 0.3), pathRow, side, depth * 0.72),
+          makeTransitionPoint(zCenter - length * (0.1 + valueNoise(seed, 5) * 0.3), pathRow, side, depth * 0.88),
+          seed,
+          false,
+        );
+      }
+    });
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.96,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "PathEdgePolygonBlend";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createWaterShorelines(): { mesh: THREE.Mesh; dispose: () => void } {
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  waterPatches.forEach((patch) => {
+    addWaterShoreline(positions, colors, patch);
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.98,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1.5,
+    polygonOffsetUnits: -1.5,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "WaterShorelinePolygons";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function createWaterPatches(): { root: THREE.Group; dispose: () => void } {
+  const root = new THREE.Group();
+  root.name = "WetlandWaterPatches";
+  const geometry = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const colors: number[] = [];
+
+  waterPatches.forEach((patch) => {
+    addWaterPatch(positions, colors, patch.x, patch.z, patch.rx, patch.rz, patch.rotation, patch.seed);
+  });
+
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.5,
+    metalness: 0,
+    flatShading: false,
+    transparent: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "WaterPatchMesh";
+  mesh.receiveShadow = true;
+  root.add(mesh);
+
+  return {
+    root,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function addGroundPatch(
+  positions: number[],
+  colors: number[],
+  centerX: number,
+  centerZ: number,
+  radiusX: number,
+  radiusZ: number,
+  rotation: number,
+  palette: string[],
+  yOffset: number,
+  seed: number,
+): void {
+  const segments = 5 + Math.floor(valueNoise(seed, 811) * 4);
+  const center: Point = {
+    x: centerX,
+    y: terrainHeight(centerX, centerZ) + yOffset,
+    z: centerZ,
+  };
+  const points: Point[] = [];
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+
+  for (let index = 0; index < segments; index += 1) {
+    const angle = (index / segments) * Math.PI * 2;
+    const wobble = 0.62 + valueNoise(seed + index * 13, 823) * 0.58;
+    const localX = Math.cos(angle) * radiusX * wobble;
+    const localZ = Math.sin(angle) * radiusZ * wobble;
+    const x = centerX + localX * cos + localZ * sin;
+    const z = centerZ - localX * sin + localZ * cos;
+    points.push({ x, y: terrainHeight(x, z) + yOffset, z });
+  }
+
+  for (let index = 0; index < points.length; index += 1) {
+    const a = points[index];
+    const b = points[(index + 1) % points.length];
+    const color = new THREE.Color(palette[(index + seed) % palette.length]);
+    color.lerp(grassColorAt(centerX, centerZ), 0.42);
+    color.lerp(new THREE.Color("#6e7d53"), valueNoise(seed, index + 829) * 0.08);
+    positions.push(center.x, center.y, center.z, a.x, a.y, a.z, b.x, b.y, b.z);
+    pushColor(colors, color, 3);
+  }
+}
+
+function addWaterShoreline(positions: number[], colors: number[], patch: WaterPatchSpec): void {
+  const segments = 24;
+  const cos = Math.cos(patch.rotation);
+  const sin = Math.sin(patch.rotation);
+  const inner: Point[] = [];
+  const outer: Point[] = [];
+
+  for (let index = 0; index < segments; index += 1) {
+    const angle = (index / segments) * Math.PI * 2;
+    const innerWobble = 0.94 + valueNoise(patch.seed + index * 23, 883) * 0.12;
+    const outerWobble = 1.05 + valueNoise(patch.seed + index * 29, 887) * 0.16;
+    const innerLocalX = Math.cos(angle) * patch.rx * innerWobble;
+    const innerLocalZ = Math.sin(angle) * patch.rz * innerWobble;
+    const outerLocalX = Math.cos(angle) * (patch.rx + 0.72) * outerWobble;
+    const outerLocalZ = Math.sin(angle) * (patch.rz + 0.58) * outerWobble;
+    const innerX = patch.x + innerLocalX * cos + innerLocalZ * sin;
+    const innerZ = patch.z - innerLocalX * sin + innerLocalZ * cos;
+    const outerX = patch.x + outerLocalX * cos + outerLocalZ * sin;
+    const outerZ = patch.z - outerLocalX * sin + outerLocalZ * cos;
+
+    inner.push({ x: innerX, y: terrainHeight(innerX, innerZ) + 0.112, z: innerZ });
+    outer.push({ x: outerX, y: terrainHeight(outerX, outerZ) + 0.109, z: outerZ });
+  }
+
+  for (let index = 0; index < segments; index += 1) {
+    const a = inner[index];
+    const b = inner[(index + 1) % segments];
+    const c = outer[(index + 1) % segments];
+    const d = outer[index];
+    const color = new THREE.Color(index % 3 === 0 ? "#777b5d" : index % 3 === 1 ? "#677d61" : "#6f805f");
+    color.lerp(grassColorAt((a.x + d.x) * 0.5, (a.z + d.z) * 0.5), 0.58);
+
+    if (valueNoise(patch.seed + index, 907) > 0.38) {
+      positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+      pushColor(colors, color, 6);
+    } else {
+      positions.push(a.x, a.y, a.z, b.x, b.y, b.z, d.x, d.y, d.z, b.x, b.y, b.z, c.x, c.y, c.z, d.x, d.y, d.z);
+      pushColor(colors, color, 6);
+    }
+  }
+}
+
+function addWaterPatch(
+  positions: number[],
+  colors: number[],
+  centerX: number,
+  centerZ: number,
+  radiusX: number,
+  radiusZ: number,
+  rotation: number,
+  seed: number,
+): void {
+  const segments = 20;
+  const center: Point = {
+    x: centerX,
+    y: terrainHeight(centerX, centerZ) + 0.13,
+    z: centerZ,
+  };
+  const points: Point[] = [];
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+
+  for (let index = 0; index < segments; index += 1) {
+    const angle = (index / segments) * Math.PI * 2;
+    const wobble = 0.82 + valueNoise(seed + index * 17, seed - index * 13) * 0.32;
+    const localX = Math.cos(angle) * radiusX * wobble;
+    const localZ = Math.sin(angle) * radiusZ * wobble;
+    const x = centerX + localX * cos + localZ * sin;
+    const z = centerZ - localX * sin + localZ * cos;
+    points.push({ x, y: center.y, z });
+  }
+
+  for (let index = 0; index < points.length; index += 1) {
+    const a = points[index];
+    const b = points[(index + 1) % points.length];
+    const color = new THREE.Color("#5d998e");
+    color.lerp(new THREE.Color(index % 2 === 0 ? "#568d84" : "#69a397"), 0.04 + valueNoise(seed + index, 97) * 0.05);
+    positions.push(center.x, center.y, center.z, a.x, a.y, a.z, b.x, b.y, b.z);
+    pushColor(colors, color, 3);
+  }
+
+  for (let facet = 0; facet < 12; facet += 1) {
+    addWaterFacet(positions, colors, centerX, centerZ, radiusX, radiusZ, rotation, seed + facet * 41);
+  }
+}
+
+function addWaterFacet(
+  positions: number[],
+  colors: number[],
+  centerX: number,
+  centerZ: number,
+  radiusX: number,
+  radiusZ: number,
+  rotation: number,
+  seed: number,
+): void {
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const angle = valueNoise(seed, 937) * Math.PI * 2;
+  const distance = Math.sqrt(valueNoise(seed, 941)) * 0.72;
+  const localX = Math.cos(angle) * radiusX * distance;
+  const localZ = Math.sin(angle) * radiusZ * distance;
+  const x = centerX + localX * cos + localZ * sin;
+  const z = centerZ - localX * sin + localZ * cos;
+  const sizeX = 0.34 + valueNoise(seed, 947) * 0.78;
+  const sizeZ = 0.05 + valueNoise(seed, 953) * 0.12;
+  const facetRotation = rotation + (valueNoise(seed, 967) - 0.5) * 1.2;
+  const facetCos = Math.cos(facetRotation);
+  const facetSin = Math.sin(facetRotation);
+  const y = terrainHeight(x, z) + 0.137;
+  const offsets = [
+    [-sizeX, -sizeZ],
+    [sizeX, -sizeZ * 0.5],
+    [sizeX * 0.72, sizeZ],
+    [-sizeX * 0.82, sizeZ * 0.68],
+  ] as const;
+  const points = offsets.map(([offsetX, offsetZ]) => ({
+    x: x + offsetX * facetCos + offsetZ * facetSin,
+    y,
+    z: z - offsetX * facetSin + offsetZ * facetCos,
+  }));
+  const color = new THREE.Color(valueNoise(seed, 971) > 0.5 ? "#76aa9e" : "#4f8b82");
+  color.lerp(new THREE.Color("#5d998e"), 0.72);
+  positions.push(
+    points[0].x,
+    points[0].y,
+    points[0].z,
+    points[1].x,
+    points[1].y,
+    points[1].z,
+    points[2].x,
+    points[2].y,
+    points[2].z,
+    points[0].x,
+    points[0].y,
+    points[0].z,
+    points[2].x,
+    points[2].y,
+    points[2].z,
+    points[3].x,
+    points[3].y,
+    points[3].z,
+  );
+  pushColor(colors, color, 6);
+}
+
+function addGrassTriangle(
+  positions: number[],
+  colors: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+): void {
+  const x = (a.x + b.x + c.x) / 3;
+  const z = (a.z + b.z + c.z) / 3;
+  const color = grassColorAt(x, z);
+
+  positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  pushColor(colors, color, 3);
+}
+
+function addEdgeBlendQuad(
+  positions: number[],
+  colors: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+  d: Point,
+  seed: number,
+  grassBite: boolean,
+): void {
+  const center: Point = {
+    x: (a.x + b.x + c.x + d.x) * 0.25 + (valueNoise(seed, 97) - 0.5) * 0.06,
+    y: (a.y + b.y + c.y + d.y) * 0.25 + 0.004,
+    z: (a.z + b.z + c.z + d.z) * 0.25 + (valueNoise(seed, 101) - 0.5) * 0.06,
+  };
+
+  addEdgeBlendTriangle(positions, colors, a, b, center, seed, grassBite);
+  addEdgeBlendTriangle(positions, colors, b, c, center, seed + 1, grassBite);
+  addEdgeBlendTriangle(positions, colors, c, d, center, seed + 2, grassBite);
+  addEdgeBlendTriangle(positions, colors, d, a, center, seed + 3, grassBite);
+}
+
+function addEdgeBlendTriangle(
+  positions: number[],
+  colors: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+  seed: number,
+  grassBite: boolean,
+): void {
+  const x = (a.x + b.x + c.x) / 3;
+  const z = (a.z + b.z + c.z) / 3;
+  const color = grassBite
+    ? grassColorAt(x, z).lerp(pathColor(seed), 0.03 + valueNoise(seed, 109) * 0.04)
+    : pathColor(seed).lerp(grassColorAt(x, z), 0.16 + valueNoise(seed, 113) * 0.1);
+
+  positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  pushColor(colors, color, 3);
+}
+
+function addPathQuad(
+  positions: number[],
+  colors: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+  d: Point,
+  seed: number,
+): void {
+  const color = pathColor(seed);
+  color.lerp(new THREE.Color("#b3a27c"), 0.32);
+
+  positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+  pushColor(colors, color, 6);
+}
+
+function addPathTriangle(
+  positions: number[],
+  colors: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+  seed: number,
+): void {
+  const color = pathColor(seed);
+  color.lerp(new THREE.Color("#b3a27c"), 0.32);
+  positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  pushColor(colors, color, 3);
+}
+
+function addPathFan(
+  positions: number[],
+  colors: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+  d: Point,
+  seed: number,
+): void {
+  const center: Point = {
+    x: (a.x + b.x + c.x + d.x) * 0.25 + (valueNoise(seed, 71) - 0.5) * 0.045,
+    y: (a.y + b.y + c.y + d.y) * 0.25 + 0.003,
+    z: (a.z + b.z + c.z + d.z) * 0.25 + (valueNoise(seed, 73) - 0.5) * 0.045,
+  };
+
+  addPathTriangle(positions, colors, a, b, center, seed);
+  addPathTriangle(positions, colors, b, c, center, seed + 1);
+  addPathTriangle(positions, colors, c, d, center, seed + 2);
+  addPathTriangle(positions, colors, d, a, center, seed + 3);
+}
+
+function pathColor(seed: number): THREE.Color {
+  const noise = valueNoise(seed * 3 + 17, seed - 29);
+  const color = new THREE.Color(pathPalette[Math.floor(noise * pathPalette.length) % pathPalette.length]);
+  color.lerp(new THREE.Color("#9d8c67"), valueNoise(seed, 23) * 0.015);
+  color.lerp(new THREE.Color("#b6a57d"), 0.42);
+  return color;
+}
+
+function grassColorAt(x: number, z: number): THREE.Color {
+  const localX = Math.floor(x * 1.35);
+  const localZ = Math.floor(z * 1.35);
+  const localNoise = valueNoise(localX, localZ);
+  const microNoise = valueNoise(localX * 7 + 13, localZ * 11 - 5);
+  const baseNoise = fbm(x * 0.16, z * 0.16);
+  const biome = biomeAt(x, z);
+  const palette = grassPalettes[biome];
+  const index = Math.floor((localNoise * 0.72 + microNoise * 0.28) * palette.length) % palette.length;
+  const color = new THREE.Color(palette[index]);
+  const unify = biome === "pineForest" ? "#4b683b" : biome === "wetland" ? "#58735d" : biome === "highland" ? "#747d5d" : "#687f4b";
+  color.lerp(new THREE.Color(unify), 0.42);
+
+  if (baseNoise > 0.72) {
+    color.lerp(new THREE.Color("#7d925c"), 0.06);
+  } else if (baseNoise < 0.24) {
+    color.lerp(new THREE.Color("#58723d"), 0.04);
+  }
+
+  return color;
+}
+
+function edgeDetail(row: number, side: -1 | 1): number {
+  const broad = (smoothNoise(row * 0.15, side * 23.1) - 0.5) * 0.74;
+  const mid = (smoothNoise(row * 0.43 + side * 3.2, side * 11.7) - 0.5) * 0.28;
+  const corner = (valueNoise(row * 11 + side * 97, row * 5 - side * 31) - 0.5) * 0.2;
+  return broad + mid + corner;
+}
+
+function pathEdgeX(z: number, row: number, side: -1 | 1): number {
+  const center = pathCenterX(z);
+  const width = pathWidthAt(z);
+  const widthNoise = side === -1
+    ? smoothNoise(z * 0.22, -17.4)
+    : smoothNoise(z * 0.2, 19.8);
+
+  return center + side * width * (0.5 + (widthNoise - 0.5) * 0.12) + edgeDetail(row, side);
+}
+
+function makeTransitionPoint(z: number, row: number, side: -1 | 1, offsetFromEdge: number): Point {
+  const x = pathEdgeX(z, row, side) + side * offsetFromEdge;
+  return {
+    x,
+    y: terrainHeight(x, z) + 0.116,
+    z,
+  };
+}
+
+function makeJitteredPoint(x: number, z: number, gx: number, gz: number): Point {
+  const isEdge = gx === 0 || gz === 0;
+  const jitter = isEdge ? 0 : 0.13;
+  return makePoint(
+    x + (valueNoise(gx, gz) - 0.5) * jitter,
+    z + (valueNoise(gx + 97, gz - 31) - 0.5) * jitter,
+    0,
+  );
+}
+
+function makePoint(x: number, z: number, yOffset: number): Point {
+  return {
+    x,
+    y: terrainHeight(x, z) + yOffset,
+    z,
+  };
+}
+
+function pushColor(colors: number[], color: THREE.Color, vertices: number): void {
+  for (let i = 0; i < vertices; i += 1) {
+    colors.push(color.r, color.g, color.b);
+  }
+}
