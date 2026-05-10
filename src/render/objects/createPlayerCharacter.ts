@@ -274,7 +274,7 @@ export function createPlayerCharacter(
       const targetRunBlend = THREE.MathUtils.clamp((speed - 4.25) / 2.1, 0, 1);
       walkBlend = THREE.MathUtils.damp(walkBlend, targetWalkBlend, 11.5, deltaSeconds);
       runBlend = THREE.MathUtils.damp(runBlend, targetRunBlend, 9, deltaSeconds);
-      const cadence = 3.85 + speed * 0.46 + runBlend * 1.1;
+      const cadence = 3.45 + speed * 0.38 + runBlend * 0.86;
       walkPhase += deltaSeconds * cadence * Math.max(walkBlend, 0.08);
 
       if (speed > 0.08) {
@@ -286,8 +286,8 @@ export function createPlayerCharacter(
       const cosYaw = Math.cos(facingYaw);
       const localForward = velocity.x * sinYaw + velocity.z * cosYaw;
       const localRight = velocity.x * cosYaw - velocity.z * sinYaw;
-      movementLean.x = THREE.MathUtils.damp(movementLean.x, localRight * 0.0045, 10, deltaSeconds);
-      movementLean.y = THREE.MathUtils.damp(movementLean.y, localForward * 0.0025, 10, deltaSeconds);
+      movementLean.x = THREE.MathUtils.damp(movementLean.x, localRight * 0.0038, 10, deltaSeconds);
+      movementLean.y = THREE.MathUtils.damp(movementLean.y, localForward * 0.0035, 10, deltaSeconds);
 
       const leftPhase = walkPhase;
       const rightPhase = walkPhase + Math.PI;
@@ -313,8 +313,8 @@ export function createPlayerCharacter(
       const talkGesture = Math.sin(elapsedSeconds * 3.2 + 0.4) * talk;
       const cue = ANIMATION_CUES[Math.floor((elapsedSeconds * 0.42 + preset.scale * 17) % ANIMATION_CUES.length)];
       const calmCue = (1 - walkEase) * (1 - attackSwing) * (1 - gatherSwing);
-      const forwardLean = (0.014 + speed * 0.0025 + runEase * 0.018) * walkEase;
-      const torsoLean = (0.01 + speed * 0.0018 + runEase * 0.012) * walkEase;
+      const forwardLean = (0.024 + speed * 0.003 + runEase * 0.016) * walkEase;
+      const torsoLean = (0.018 + speed * 0.002 + runEase * 0.01) * walkEase;
 
       syncEquipment(rig.equipment, equipment);
       rig.facing.rotation.y = facingYaw;
@@ -411,7 +411,7 @@ function createRig(
 
   const hips = new THREE.Group();
   hips.name = "Hips";
-  hips.position.y = 0.92;
+  hips.position.y = 0.98;
   facing.add(hips);
 
   const pelvis = mesh(geometries.pelvis, materials.darkTunic, "Pelvis");
@@ -422,6 +422,12 @@ function createRig(
   belt.position.y = 0.14;
   belt.scale.set(1.05 * silhouette.hipWidth, 1, 0.84 * silhouette.torsoDepth);
   hips.add(belt);
+
+  const beltBuckle = mesh(geometries.detailPlate, materials.trim, "BeltBuckle");
+  beltBuckle.position.set(0, 0.16, 0.24 * silhouette.torsoDepth);
+  beltBuckle.rotation.x = Math.PI / 2;
+  beltBuckle.scale.set(0.28, 0.16, 0.2);
+  hips.add(beltBuckle);
 
   const sidePouch = mesh(geometries.pouch, materials.leather, "SidePouch");
   sidePouch.position.set(0.24 * silhouette.hipWidth, 0.05, 0.2 * silhouette.torsoDepth);
@@ -455,6 +461,19 @@ function createRig(
   trimPlate.rotation.x = Math.PI / 2;
   trimPlate.scale.set(0.36, 0.2, 0.24);
   torso.add(trimPlate);
+
+  const pack = mesh(geometries.pouch, materials.leather, "TravelPack");
+  pack.position.set(0, 0.32, -0.27 * silhouette.torsoDepth);
+  pack.scale.set(1.9 * silhouette.torsoWidth, 1.85, 1.16 * silhouette.torsoDepth);
+  torso.add(pack);
+
+  ([-1, 1] as const).forEach((sideSign) => {
+    const pad = mesh(geometries.cuff, materials.trim, sideSign < 0 ? "LeftShoulderPad" : "RightShoulderPad");
+    pad.position.set(sideSign * 0.31 * silhouette.shoulderWidth, 0.57, 0.02);
+    pad.rotation.z = sideSign * Math.PI * 0.5;
+    pad.scale.set(0.96 * silhouette.limbWidth, 0.58, 0.76 * silhouette.limbWidth);
+    torso.add(pad);
+  });
 
   const chest = new THREE.Group();
   chest.name = "Chest";
@@ -490,9 +509,9 @@ function createRig(
 
 function createGeometries(): GeometrySet {
   return {
-    pelvis: new THREE.CylinderGeometry(0.21, 0.27, 0.22, 8),
-    waist: new THREE.CylinderGeometry(0.29, 0.26, 0.06, 8),
-    torso: new THREE.CylinderGeometry(0.24, 0.32, 0.66, 8),
+    pelvis: new THREE.BoxGeometry(0.42, 0.22, 0.32),
+    waist: new THREE.BoxGeometry(0.52, 0.065, 0.34),
+    torso: new THREE.BoxGeometry(0.52, 0.68, 0.36),
     detailPlate: new THREE.CylinderGeometry(0.075, 0.085, 0.026, 8),
     collar: new THREE.BoxGeometry(0.36, 0.055, 0.08),
     strap: new THREE.BoxGeometry(0.055, 0.62, 0.035),
@@ -502,12 +521,12 @@ function createGeometries(): GeometrySet {
     head: new THREE.DodecahedronGeometry(0.2, 0),
     hair: new THREE.DodecahedronGeometry(0.18, 0),
     eye: new THREE.SphereGeometry(0.018, 6, 4),
-    upperArm: new THREE.CylinderGeometry(0.055, 0.073, 0.38, 8),
-    forearm: new THREE.CylinderGeometry(0.05, 0.064, 0.34, 8),
+    upperArm: new THREE.BoxGeometry(0.12, 0.38, 0.13),
+    forearm: new THREE.BoxGeometry(0.105, 0.34, 0.12),
     hand: new THREE.DodecahedronGeometry(0.068, 0),
-    thigh: new THREE.CylinderGeometry(0.07, 0.092, 0.42, 8),
-    shin: new THREE.CylinderGeometry(0.058, 0.074, 0.38, 8),
-    foot: new THREE.DodecahedronGeometry(0.105, 0),
+    thigh: new THREE.BoxGeometry(0.14, 0.42, 0.15),
+    shin: new THREE.BoxGeometry(0.12, 0.38, 0.13),
+    foot: new THREE.BoxGeometry(0.17, 0.08, 0.3),
     gem: new THREE.DodecahedronGeometry(0.07, 0),
     toolHandle: new THREE.BoxGeometry(0.055, 0.62, 0.055),
     pickHead: new THREE.BoxGeometry(0.48, 0.07, 0.08),
@@ -608,15 +627,21 @@ function addHead(
 
   [-1, 1].forEach((sideSign) => {
     const eye = mesh(geometries.eye, materials.eye, sideSign < 0 ? "LeftEye" : "RightEye");
-    eye.position.set(sideSign * 0.055 * silhouette.headScale, 0.025 * silhouette.headScale, 0.18 * silhouette.headScale);
-    eye.scale.set(1, 0.75, 0.72);
+    eye.position.set(sideSign * 0.058 * silhouette.headScale, 0.024 * silhouette.headScale, 0.183 * silhouette.headScale);
+    eye.scale.set(1.22, 0.9, 0.78);
     head.add(eye);
 
     const brow = mesh(geometries.detailPlate, materials.hair, sideSign < 0 ? "LeftBrow" : "RightBrow");
-    brow.position.set(sideSign * 0.055 * silhouette.headScale, 0.055 * silhouette.headScale, 0.185 * silhouette.headScale);
+    brow.position.set(sideSign * 0.058 * silhouette.headScale, 0.062 * silhouette.headScale, 0.188 * silhouette.headScale);
     brow.rotation.z = sideSign * -0.16;
-    brow.scale.set(0.32 * silhouette.headScale, 0.14 * silhouette.headScale, 0.16 * silhouette.headScale);
+    brow.scale.set(0.4 * silhouette.headScale, 0.13 * silhouette.headScale, 0.14 * silhouette.headScale);
     head.add(brow);
+
+    const cheek = mesh(geometries.detailPlate, materials.skin, sideSign < 0 ? "LeftCheekPlane" : "RightCheekPlane");
+    cheek.position.set(sideSign * 0.067 * silhouette.headScale, -0.03 * silhouette.headScale, 0.189 * silhouette.headScale);
+    cheek.rotation.x = Math.PI / 2;
+    cheek.scale.set(0.22 * silhouette.headScale, 0.12 * silhouette.headScale, 0.08 * silhouette.headScale);
+    head.add(cheek);
   });
 
   const nose = mesh(geometries.gem, materials.skin, "Nose");
@@ -627,7 +652,7 @@ function addHead(
   const mouth = mesh(geometries.detailPlate, materials.leather, "Mouth");
   mouth.position.set(0, -0.075 * silhouette.headScale, 0.187 * silhouette.headScale);
   mouth.rotation.x = Math.PI / 2;
-  mouth.scale.set(0.42 * silhouette.headScale, 0.1 * silhouette.headScale, 0.1 * silhouette.headScale);
+  mouth.scale.set(0.36 * silhouette.headScale, 0.075 * silhouette.headScale, 0.08 * silhouette.headScale);
   head.add(mouth);
 }
 
@@ -739,7 +764,7 @@ function createArm(
 
   const upper = mesh(geometries.upperArm, materials.tunic, `${side}UpperArm`);
   upper.position.y = -0.19 * silhouette.armLength;
-  upper.scale.set(0.82 * silhouette.limbWidth, silhouette.armLength, 0.82 * silhouette.limbWidth);
+  upper.scale.set(1.04 * silhouette.limbWidth, silhouette.armLength, 1.0 * silhouette.limbWidth);
   shoulder.add(upper);
 
   const elbow = new THREE.Group();
@@ -749,7 +774,7 @@ function createArm(
 
   const forearm = mesh(geometries.forearm, materials.darkTunic, `${side}Forearm`);
   forearm.position.y = -0.17 * silhouette.armLength;
-  forearm.scale.set(0.8 * silhouette.limbWidth, silhouette.armLength, 0.8 * silhouette.limbWidth);
+  forearm.scale.set(0.96 * silhouette.limbWidth, silhouette.armLength, 0.94 * silhouette.limbWidth);
   elbow.add(forearm);
 
   const hand = new THREE.Group();
@@ -782,7 +807,7 @@ function createLeg(
 
   const thigh = mesh(geometries.thigh, materials.pants, `${side}Thigh`);
   thigh.position.y = -0.21 * silhouette.legLength;
-  thigh.scale.set(0.9 * silhouette.limbWidth, silhouette.legLength, 0.9 * silhouette.limbWidth);
+  thigh.scale.set(1.08 * silhouette.limbWidth, silhouette.legLength, 1.04 * silhouette.limbWidth);
   hip.add(thigh);
 
   const knee = new THREE.Group();
@@ -792,7 +817,7 @@ function createLeg(
 
   const shin = mesh(geometries.shin, materials.boot, `${side}Shin`);
   shin.position.y = -0.19 * silhouette.legLength;
-  shin.scale.set(0.88 * silhouette.limbWidth, silhouette.legLength, 0.88 * silhouette.limbWidth);
+  shin.scale.set(1.02 * silhouette.limbWidth, silhouette.legLength, 1.0 * silhouette.limbWidth);
   knee.add(shin);
 
   const ankle = new THREE.Group();
@@ -808,7 +833,7 @@ function createLeg(
 
   const footMesh = mesh(geometries.foot, materials.boot, `${side}FootMesh`);
   footMesh.position.set(0, 0.035, 0.07);
-  footMesh.scale.set(0.72 * silhouette.footWidth, 0.32, 1.34);
+  footMesh.scale.set(1.08 * silhouette.footWidth, 0.58, 1.42);
   ankle.add(footMesh);
 
   return { hip, knee, ankle, baseAnkleY };
@@ -823,9 +848,9 @@ function animateLeg(leg: LegRig, phase: number, blend: number, runBlend: number)
   const lift = Math.sin(swingProgress * Math.PI) * swingWeight;
   const easedBlend = smoothStep(blend);
   const runEase = smoothStep(runBlend);
-  const strideAmplitude = 0.27 + runEase * 0.11;
-  const swingZ = THREE.MathUtils.lerp(-0.025, 0.04 + runEase * 0.016, swingProgress);
-  const plantedZ = THREE.MathUtils.lerp(0.03 + runEase * 0.01, -0.032 - runEase * 0.012, plantProgress);
+  const strideAmplitude = 0.23 + runEase * 0.09;
+  const swingZ = THREE.MathUtils.lerp(-0.02, 0.05 + runEase * 0.012, swingProgress);
+  const plantedZ = THREE.MathUtils.lerp(0.026 + runEase * 0.008, -0.026 - runEase * 0.01, plantProgress);
   const ankleZ = stride >= 0 ? swingZ : plantedZ;
   const heelStrike = contactWeight * (1 - plantProgress);
   const toePush = contactWeight * plantProgress;
@@ -833,9 +858,9 @@ function animateLeg(leg: LegRig, phase: number, blend: number, runBlend: number)
   leg.hip.rotation.x = (stride * strideAmplitude - contactWeight * 0.035) * easedBlend;
   leg.hip.rotation.y = stride * (0.018 + runEase * 0.014) * easedBlend;
   leg.hip.rotation.z = stride * (0.012 + runEase * 0.007) * easedBlend;
-  leg.knee.rotation.x = (0.024 + lift * (0.32 + runEase * 0.13) + contactWeight * 0.052) * easedBlend;
+  leg.knee.rotation.x = (0.03 + lift * (0.38 + runEase * 0.12) + contactWeight * 0.046) * easedBlend;
   leg.knee.rotation.y = -stride * 0.008 * easedBlend;
-  leg.ankle.position.y = leg.baseAnkleY + lift * (0.062 + runEase * 0.034) * easedBlend - contactWeight * 0.002 * easedBlend;
+  leg.ankle.position.y = leg.baseAnkleY + lift * (0.074 + runEase * 0.028) * easedBlend - contactWeight * 0.002 * easedBlend;
   leg.ankle.position.z = 0.1 + ankleZ * easedBlend;
   leg.ankle.rotation.x = (-lift * (0.18 + runEase * 0.08) + heelStrike * 0.12 - toePush * 0.09) * easedBlend;
   leg.ankle.rotation.z = -stride * (0.018 + runEase * 0.012) * easedBlend;
@@ -923,9 +948,9 @@ function getSilhouette(id: CharacterStyleId): CharacterSilhouette {
         hipWidth: 1,
         legSpacing: 1,
         armLength: 1,
-        legLength: 1,
-        limbWidth: 1,
-        footWidth: 1,
+        legLength: 0.96,
+        limbWidth: 1.13,
+        footWidth: 1.24,
         headScale: 1,
       };
   }
