@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { worldColliders, type WorldCollider } from "../content/worldProps";
 import { worldProps, type WorldProp, type WorldPropKind } from "../content/worldProps";
-import { biomeAt, OPENING_PATH_START_Z, pathCenterX, type BiomeId, WORLD_SIZE } from "../content/worldMap";
+import { biomeAt, openingCoveCenterX, OPENING_COVE_SPAWN_Z, type BiomeId, WORLD_SIZE } from "../content/worldMap";
 
 export type ResourceKind = "wood" | "stone" | "herb" | "coin";
 export type EnemyKind = "trailGuardian" | "boar" | "stoneSentinel" | "reedWisp";
@@ -37,8 +37,8 @@ export type TutorialStage =
   | "returnRoute";
 
 export const GUIDE_NPC_POSITION = { x: -6.35, z: -0.55 } as const;
-const START_SPAWN_Z = OPENING_PATH_START_Z + 16.0;
-const START_SPAWN_X = pathCenterX(START_SPAWN_Z);
+const START_SPAWN_Z = OPENING_COVE_SPAWN_Z;
+const START_SPAWN_X = openingCoveCenterX();
 
 export type DialogueRequest = {
   id: number;

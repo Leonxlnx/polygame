@@ -1,4 +1,4 @@
-import { biomeAt, OPENING_PATH_START_Z, pathCenterX, pathWidthAt, valueNoise, WORLD_SIZE } from "./worldMap";
+import { biomeAt, openingCoveCenterX, openingCoveExitX, OPENING_COVE_EXIT_Z, OPENING_COVE_SPAWN_Z, OPENING_PATH_START_Z, pathCenterX, pathWidthAt, valueNoise, WORLD_SIZE } from "./worldMap";
 
 export type WorldPropKind =
   | "pine"
@@ -423,6 +423,7 @@ function addVillageProps(props: WorldProp[]): void {
 
 function addCoveStartProps(props: WorldProp[]): void {
   const coveProps = [
+    ...openingOffRoadCoveProps(),
     ...openingRearWallProps(),
     ...openingSideProps(),
     ...openingCoveLandmarkProps(),
@@ -441,6 +442,27 @@ function addCoveStartProps(props: WorldProp[]): void {
       collides: prop.collides,
     });
   });
+}
+
+function openingOffRoadCoveProps(): Array<{ kind: WorldPropKind; x: number; z: number; scale: number; rotation: number; collides: boolean }> {
+  const cx = openingCoveCenterX();
+  const cz = OPENING_COVE_SPAWN_Z;
+  const exitX = openingCoveExitX();
+  const exitZ = OPENING_COVE_EXIT_Z;
+
+  return [
+    { kind: "boulder", x: cx - 4.8, z: cz - 1.9, scale: 1.32, rotation: -0.4, collides: true },
+    { kind: "boulder", x: cx - 3.4, z: cz - 4.0, scale: 1.12, rotation: 0.25, collides: true },
+    { kind: "pine", x: cx - 6.2, z: cz + 0.8, scale: 1.22, rotation: 0.2, collides: true },
+    { kind: "pine", x: cx - 5.3, z: cz + 3.8, scale: 1.1, rotation: -0.16, collides: true },
+    { kind: "rock", x: cx + 0.2, z: cz - 3.8, scale: 0.72, rotation: 0.7, collides: true },
+    { kind: "stump", x: cx - 2.9, z: cz + 2.3, scale: 0.58, rotation: 0.1, collides: true },
+    { kind: "log", x: cx + 2.7, z: cz - 1.8, scale: 0.78, rotation: 1.25, collides: true },
+    { kind: "flower", x: cx + 1.7, z: cz + 1.45, scale: 1.08, rotation: 0.8, collides: false },
+    { kind: "flower", x: cx + 0.9, z: cz + 1.95, scale: 0.94, rotation: -0.5, collides: false },
+    { kind: "torch", x: exitX - 1.4, z: exitZ - 1.1, scale: 0.88, rotation: 0.2, collides: false },
+    { kind: "marker", x: exitX + 1.5, z: exitZ + 0.1, scale: 0.66, rotation: -0.6, collides: false },
+  ];
 }
 
 function openingCoveLandmarkProps(): Array<{ kind: WorldPropKind; x: number; z: number; scale: number; rotation: number; collides: boolean }> {

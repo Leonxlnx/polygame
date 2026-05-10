@@ -23,6 +23,15 @@
           <span class="resource-chip resource-herb"><i aria-hidden="true"></i><span>Herb</span><strong id="herb-value">0</strong></span>
           <span class="resource-chip resource-coin"><i aria-hidden="true"></i><span>Coin</span><strong id="coin-value">0</strong></span>
         </div>
+        <button id="mini-map" class="mini-map" type="button" aria-label="Open map">
+          <span class="mini-map-title">Map</span>
+          <span class="mini-map-terrain" aria-hidden="true">
+            <i class="mini-map-route mini-map-route-main"></i>
+            <i class="mini-map-route mini-map-route-west"></i>
+            <i class="mini-map-route mini-map-route-east"></i>
+            <i id="mini-map-player" class="map-player-pin"></i>
+          </span>
+        </button>
         <button id="hud-settings-button" class="hud-settings-button" type="button" aria-label="Settings">Settings</button>
         <div id="quest-panel" class="quest-panel">
           <div class="quest-title">Next Step</div>
@@ -75,6 +84,35 @@
           <div class="slot slot-build"><span>3</span><i aria-hidden="true"></i><strong>Build</strong></div>
           <div class="slot slot-attack"><span>4</span><i aria-hidden="true"></i><strong>Swing</strong></div>
           <div class="slot slot-pack is-ready"><span>I</span><i aria-hidden="true"></i><strong>Pack</strong></div>
+        </div>
+        <div id="world-map-panel" class="world-map-panel is-hidden" role="dialog" aria-label="World map">
+          <div class="world-map-card">
+            <div class="world-map-header">
+              <div>
+                <span class="eyebrow">World Map</span>
+                <h2>Morning Valley</h2>
+              </div>
+              <button id="map-close" class="map-close" type="button" aria-label="Close map">Close</button>
+            </div>
+            <div class="world-map-body">
+              <div class="world-map-terrain" aria-hidden="true">
+                <span class="map-region map-region-cove">Cove</span>
+                <span class="map-region map-region-camp">Camp</span>
+                <span class="map-region map-region-stone">Stone Rise</span>
+                <span class="map-region map-region-reed">Reedfen</span>
+                <span class="map-region map-region-pine">Pinewood</span>
+                <i class="world-map-path world-map-path-main"></i>
+                <i class="world-map-path world-map-path-west"></i>
+                <i class="world-map-path world-map-path-east"></i>
+                <i id="world-map-player" class="map-player-pin"></i>
+              </div>
+              <div class="world-map-notes">
+                <strong id="map-region-label">First Camp</strong>
+                <span id="map-objective-label">Walk out of the cove.</span>
+                <small>M opens or closes the map.</small>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <section id="main-menu" class="screen screen-menu" aria-label="Main menu">

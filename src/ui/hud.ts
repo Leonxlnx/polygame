@@ -1,5 +1,5 @@
 import type { GameState } from "../game/simulation/GameState";
-import { biomeLabel } from "../game/content/worldMap";
+import { biomeLabel, WORLD_SIZE } from "../game/content/worldMap";
 
 export type Hud = {
   update: (state: GameState) => void;
@@ -43,6 +43,10 @@ export function createHud(root: HTMLElement): Hud {
   const buildSlot = requireElement(root, ".slot-build");
   const attackSlot = requireElement(root, ".slot-attack");
   const packSlot = requireElement(root, ".slot-pack");
+  const miniMapPlayer = requireElement(root, "#mini-map-player");
+  const worldMapPlayer = requireElement(root, "#world-map-player");
+  const mapRegionLabel = requireElement(root, "#map-region-label");
+  const mapObjectiveLabel = requireElement(root, "#map-objective-label");
 
   return {
     update: (state: GameState) => {
@@ -100,6 +104,7 @@ export function createHud(root: HTMLElement): Hud {
       chapterCardTitle.textContent = state.action.chapterCueTitle;
       chapterCardText.textContent = state.action.chapterCueText;
       chapterCard.classList.toggle("is-hidden", state.action.chapterCueTimer <= 0);
+      syncMapMarkers(state, miniMapPlayer, worldMapPlayer, mapRegionLabel, mapObjectiveLabel);
     },
   };
 }
@@ -137,6 +142,31 @@ function syncHarvestProgress(
   label.textContent = node?.actionLabel ?? "Working";
   percent.textContent = `${Math.round(clamped * 100)}%`;
   fill.style.width = `${Math.round(clamped * 100)}%`;
+}
+
+function syncMapMarkers(
+  state: GameState,
+  miniMapPlayer: HTMLElement,
+  worldMapPlayer: HTMLElement,
+  mapRegionLabel: HTMLElement,
+  mapObjectiveLabel: HTMLElement,
+): void {
+  const xPercent = clamp(50 + (state.player.position.x / WORLD_SIZE) * 100, 4, 96);
+  const zPercent = clamp(50 + (state.player.position.z / WORLD_SIZE) * 100, 4, 96);
+  const rotation = `${state.player.facingYaw}rad`;
+
+  [miniMapPlayer, worldMapPlayer].forEach((pin) => {
+    pin.style.left = `${xPercent}%`;
+    pin.style.top = `${zPercent}%`;
+    pin.style.setProperty("--player-yaw", rotation);
+  });
+
+  mapRegionLabel.textContent = biomeLabel(state.world.currentBiome);
+  mapObjectiveLabel.textContent = state.quest.currentObjective;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function isAtLeast(current: TutorialStage, target: TutorialStage): boolean {

@@ -1,5 +1,20 @@
 import * as THREE from "three";
-import { biomeAt, fbm, OPENING_PATH_START_Z, pathCenterX, pathWidthAt, smoothNoise, terrainHeight, valueNoise, WORLD_SIZE, type BiomeId } from "../../game/content/worldMap";
+import {
+  biomeAt,
+  fbm,
+  openingCoveCenterX,
+  openingCoveExitX,
+  OPENING_COVE_EXIT_Z,
+  OPENING_COVE_SPAWN_Z,
+  OPENING_PATH_START_Z,
+  pathCenterX,
+  pathWidthAt,
+  smoothNoise,
+  terrainHeight,
+  valueNoise,
+  WORLD_SIZE,
+  type BiomeId,
+} from "../../game/content/worldMap";
 import { worldProps } from "../../game/content/worldProps";
 import { createWorldPropObjects } from "./createWorldPropObjects";
 
@@ -61,6 +76,7 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
   const openingGrass = createOpeningGrassDetail();
   const biomeDetails = createBiomeGroundDetails(worldSize);
   const path = createPathMosaic(worldSize);
+  const covePath = createOpeningCovePathMosaic();
   const branches = createBranchPathMosaics();
   const edgeBlend = createPathEdgeBlend(worldSize);
   const terraces = createVoxelTerraces();
@@ -69,7 +85,7 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
   let props = createWorldPropObjects(worldProps);
   let hiddenSignature = "";
 
-  root.add(base.mesh, grass.mesh, openingGrass.mesh, biomeDetails.mesh, path.mesh, branches.mesh, edgeBlend.mesh, terraces.root, shorelines.mesh, water.root, props.root);
+  root.add(base.mesh, grass.mesh, openingGrass.mesh, biomeDetails.mesh, path.mesh, covePath.mesh, branches.mesh, edgeBlend.mesh, terraces.root, shorelines.mesh, water.root, props.root);
 
   return {
     root,
@@ -89,6 +105,7 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
       openingGrass.dispose();
       biomeDetails.dispose();
       path.dispose();
+      covePath.dispose();
       branches.dispose();
       edgeBlend.dispose();
       terraces.dispose();
@@ -532,6 +549,136 @@ function createPathMosaic(size: number): { mesh: THREE.Mesh; dispose: () => void
       material.dispose();
     },
   };
+}
+
+function createOpeningCovePathMosaic(): { mesh: THREE.Mesh; dispose: () => void } {
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const coveX = openingCoveCenterX();
+  const coveZ = OPENING_COVE_SPAWN_Z;
+
+  addPathPatch(positions, colors, coveX, coveZ, 4.0, 3.0, -0.18, 17001, 15);
+  addPathPatch(positions, colors, coveX + 1.5, coveZ + 2.2, 2.4, 1.55, 0.42, 17037, 10);
+  addOpeningCoveConnector(positions, colors);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.94,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -0.9,
+    polygonOffsetUnits: -0.9,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = "OpeningCovePathMosaic";
+  mesh.receiveShadow = true;
+
+  return {
+    mesh,
+    dispose: () => {
+      geometry.dispose();
+      material.dispose();
+    },
+  };
+}
+
+function addOpeningCoveConnector(positions: number[], colors: number[]): void {
+  const start = { x: openingCoveCenterX() + 2.2, z: OPENING_COVE_SPAWN_Z + 1.1 };
+  const end = { x: openingCoveExitX(), z: OPENING_COVE_EXIT_Z };
+  const control = { x: (start.x + end.x) * 0.5 - 1.2, z: (start.z + end.z) * 0.5 + 0.7 };
+  const rows = 34;
+  const columns = 4;
+  const points: Point[][] = [];
+
+  for (let row = 0; row <= rows; row += 1) {
+    points[row] = [];
+    const t = row / rows;
+    const inv = 1 - t;
+    const centerX = inv * inv * start.x + 2 * inv * t * control.x + t * t * end.x;
+    const centerZ = inv * inv * start.z + 2 * inv * t * control.z + t * t * end.z;
+    const nextT = Math.min(1, t + 1 / rows);
+    const nextInv = 1 - nextT;
+    const nextX = nextInv * nextInv * start.x + 2 * nextInv * nextT * control.x + nextT * nextT * end.x;
+    const nextZ = nextInv * nextInv * start.z + 2 * nextInv * nextT * control.z + nextT * nextT * end.z;
+    const tangentX = nextX - centerX;
+    const tangentZ = nextZ - centerZ;
+    const length = Math.hypot(tangentX, tangentZ) || 1;
+    const normalX = -tangentZ / length;
+    const normalZ = tangentX / length;
+    const localWidth = 2.45 + Math.sin(t * Math.PI) * 0.95 + (smoothNoise(row * 0.21, 18.3) - 0.5) * 0.18;
+
+    for (let column = 0; column <= columns; column += 1) {
+      const edge = column === 0 || column === columns;
+      const u = column / columns - 0.5 + (edge ? 0 : (valueNoise(row * 31, column * 73) - 0.5) * 0.04);
+      const ragged = edge ? (valueNoise(row * 43, column * 89) - 0.5) * 0.28 : 0;
+      const x = centerX + normalX * (u * localWidth + ragged);
+      const z = centerZ + normalZ * (u * localWidth + ragged);
+      points[row][column] = {
+        x,
+        y: terrainHeight(x, z) + 0.112,
+        z,
+      };
+    }
+  }
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const a = points[row][column];
+      const b = points[row + 1][column];
+      const c = points[row + 1][column + 1];
+      const d = points[row][column + 1];
+      const seed = 18000 + row * 97 + column * 17;
+
+      if (valueNoise(seed, 31) < 0.66) {
+        addPathTriangle(positions, colors, a, b, c, seed);
+        addPathTriangle(positions, colors, a, c, d, seed + 1);
+      } else {
+        addPathFan(positions, colors, a, b, c, d, seed);
+      }
+    }
+  }
+}
+
+function addPathPatch(
+  positions: number[],
+  colors: number[],
+  centerX: number,
+  centerZ: number,
+  radiusX: number,
+  radiusZ: number,
+  rotation: number,
+  seed: number,
+  segments: number,
+): void {
+  const center: Point = {
+    x: centerX,
+    y: terrainHeight(centerX, centerZ) + 0.114,
+    z: centerZ,
+  };
+  const points: Point[] = [];
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+
+  for (let index = 0; index < segments; index += 1) {
+    const angle = (index / segments) * Math.PI * 2;
+    const wobble = 0.78 + valueNoise(seed + index * 11, 701) * 0.34;
+    const localX = Math.cos(angle) * radiusX * wobble;
+    const localZ = Math.sin(angle) * radiusZ * wobble;
+    const x = centerX + localX * cos + localZ * sin;
+    const z = centerZ - localX * sin + localZ * cos;
+    points.push({ x, y: terrainHeight(x, z) + 0.114, z });
+  }
+
+  for (let index = 0; index < points.length; index += 1) {
+    addPathTriangle(positions, colors, center, points[index], points[(index + 1) % points.length], seed + index);
+  }
 }
 
 function createBranchPathMosaics(): { mesh: THREE.Mesh; dispose: () => void } {

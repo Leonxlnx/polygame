@@ -526,7 +526,7 @@ function createGeometries(): GeometrySet {
     hand: new THREE.DodecahedronGeometry(0.068, 0),
     thigh: new THREE.BoxGeometry(0.14, 0.42, 0.15),
     shin: new THREE.BoxGeometry(0.12, 0.38, 0.13),
-    foot: new THREE.BoxGeometry(0.17, 0.08, 0.3),
+    foot: new THREE.BoxGeometry(0.155, 0.075, 0.24),
     gem: new THREE.DodecahedronGeometry(0.07, 0),
     toolHandle: new THREE.BoxGeometry(0.055, 0.62, 0.055),
     pickHead: new THREE.BoxGeometry(0.48, 0.07, 0.08),
@@ -823,7 +823,7 @@ function createLeg(
   const ankle = new THREE.Group();
   ankle.name = `${side}Ankle`;
   const baseAnkleY = -0.39 * silhouette.legLength;
-  ankle.position.set(0, baseAnkleY, 0.1);
+  ankle.position.set(0, baseAnkleY, 0.075);
   knee.add(ankle);
 
   const bootCuff = mesh(geometries.cuff, materials.leather, `${side}BootCuff`);
@@ -832,8 +832,8 @@ function createLeg(
   knee.add(bootCuff);
 
   const footMesh = mesh(geometries.foot, materials.boot, `${side}FootMesh`);
-  footMesh.position.set(0, 0.035, 0.07);
-  footMesh.scale.set(1.08 * silhouette.footWidth, 0.58, 1.42);
+  footMesh.position.set(0, 0.034, 0.052);
+  footMesh.scale.set(0.96 * silhouette.footWidth, 0.56, 1.08);
   ankle.add(footMesh);
 
   return { hip, knee, ankle, baseAnkleY };
@@ -861,7 +861,7 @@ function animateLeg(leg: LegRig, phase: number, blend: number, runBlend: number)
   leg.knee.rotation.x = (0.03 + lift * (0.38 + runEase * 0.12) + contactWeight * 0.046) * easedBlend;
   leg.knee.rotation.y = -stride * 0.008 * easedBlend;
   leg.ankle.position.y = leg.baseAnkleY + lift * (0.074 + runEase * 0.028) * easedBlend - contactWeight * 0.002 * easedBlend;
-  leg.ankle.position.z = 0.1 + ankleZ * easedBlend;
+  leg.ankle.position.z = 0.075 + ankleZ * easedBlend;
   leg.ankle.rotation.x = (-lift * (0.18 + runEase * 0.08) + heelStrike * 0.12 - toePush * 0.09) * easedBlend;
   leg.ankle.rotation.z = -stride * (0.018 + runEase * 0.012) * easedBlend;
 }
@@ -893,7 +893,7 @@ function getSilhouette(id: CharacterStyleId): CharacterSilhouette {
         armLength: 1,
         legLength: 0.98,
         limbWidth: 1.14,
-        footWidth: 1.14,
+        footWidth: 0.98,
         headScale: 1.02,
       };
     case "arcanist":
@@ -907,7 +907,7 @@ function getSilhouette(id: CharacterStyleId): CharacterSilhouette {
         armLength: 1.06,
         legLength: 1.04,
         limbWidth: 0.92,
-        footWidth: 0.94,
+        footWidth: 0.82,
         headScale: 1,
       };
     case "warden":
@@ -921,7 +921,7 @@ function getSilhouette(id: CharacterStyleId): CharacterSilhouette {
         armLength: 1,
         legLength: 1,
         limbWidth: 1.08,
-        footWidth: 1.1,
+        footWidth: 0.94,
         headScale: 0.98,
       };
     case "duelist":
@@ -935,7 +935,7 @@ function getSilhouette(id: CharacterStyleId): CharacterSilhouette {
         armLength: 1.04,
         legLength: 1.05,
         limbWidth: 0.9,
-        footWidth: 0.9,
+        footWidth: 0.78,
         headScale: 0.96,
       };
     case "pathfinder":
@@ -950,7 +950,7 @@ function getSilhouette(id: CharacterStyleId): CharacterSilhouette {
         armLength: 1,
         legLength: 0.96,
         limbWidth: 1.13,
-        footWidth: 1.24,
+        footWidth: 0.96,
         headScale: 1,
       };
   }

@@ -31,6 +31,9 @@ const settingsPanel = document.querySelector<HTMLElement>("#settings-panel");
 const settingsClose = document.querySelector<HTMLButtonElement>("#settings-close");
 const settingsAudio = document.querySelector<HTMLInputElement>("#settings-audio");
 const settingsMotion = document.querySelector<HTMLInputElement>("#settings-motion");
+const miniMap = document.querySelector<HTMLButtonElement>("#mini-map");
+const worldMapPanel = document.querySelector<HTMLElement>("#world-map-panel");
+const mapClose = document.querySelector<HTMLButtonElement>("#map-close");
 
 if (
   !canvas ||
@@ -62,7 +65,10 @@ if (
   !settingsPanel ||
   !settingsClose ||
   !settingsAudio ||
-  !settingsMotion
+  !settingsMotion ||
+  !miniMap ||
+  !worldMapPanel ||
+  !mapClose
 ) {
   throw new Error("Hearthwild could not find its required UI roots.");
 }
@@ -85,6 +91,7 @@ const app = new GameApp({
   quickStart,
   initialPhase,
   debugSpawn,
+  initialMapOpen: searchParams.get("map") === "1",
   ui: {
     mainMenu,
     loadingScreen,
@@ -114,6 +121,9 @@ const app = new GameApp({
     settingsClose,
     settingsAudio,
     settingsMotion,
+    miniMap,
+    worldMapPanel,
+    mapClose,
   },
 });
 app.start();

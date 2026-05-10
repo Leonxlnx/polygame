@@ -1,5 +1,7 @@
 export const WORLD_SIZE = 1440;
 export const OPENING_PATH_START_Z = -38.35;
+export const OPENING_COVE_SPAWN_Z = -28.2;
+export const OPENING_COVE_EXIT_Z = -17.8;
 
 export type BiomeId = "village" | "meadow" | "pineForest" | "highland" | "wetland";
 
@@ -23,13 +25,26 @@ export function pathCenterX(z: number): number {
   return -z * 0.08 + Math.sin(z * 0.043) * 8.4 + Math.sin(z * 0.103 + 1.6) * 2.4 + Math.sin(z * 0.017 - 0.4) * 3.2;
 }
 
+export function openingCoveCenterX(): number {
+  return pathCenterX(OPENING_COVE_SPAWN_Z) - 8.6;
+}
+
+export function openingCoveExitX(): number {
+  return pathCenterX(OPENING_COVE_EXIT_Z) - 2.2;
+}
+
 export function pathWidthAt(z: number): number {
   return 5.35 + (smoothNoise(z * 0.044, 12.7) - 0.5) * 1.15 + (smoothNoise(z * 0.16, -4.8) - 0.5) * 0.42;
 }
 
 export function biomeAt(x: number, z: number): BiomeId {
+  const coveDistance = Math.hypot(x - openingCoveCenterX(), z - OPENING_COVE_SPAWN_Z);
   const distanceFromStart = Math.hypot(x + 5, z - 2);
   const pathDistance = Math.abs(x - pathCenterX(z));
+
+  if (coveDistance < 24) {
+    return "village";
+  }
 
   if (distanceFromStart < 23 || (z > -18 && z < 26 && pathDistance < pathWidthAt(z) + 13)) {
     return "village";

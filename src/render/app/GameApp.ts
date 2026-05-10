@@ -57,6 +57,9 @@ type GameUi = {
   settingsClose: HTMLButtonElement;
   settingsAudio: HTMLInputElement;
   settingsMotion: HTMLInputElement;
+  miniMap: HTMLButtonElement;
+  worldMapPanel: HTMLElement;
+  mapClose: HTMLButtonElement;
 };
 
 type GameAppOptions = {
@@ -66,6 +69,7 @@ type GameAppOptions = {
   quickStart?: boolean;
   initialPhase?: Extract<GamePhase, "characterSelect">;
   debugSpawn?: { x: number; z: number };
+  initialMapOpen?: boolean;
 };
 
 type PreviewSlot = {
@@ -211,6 +215,8 @@ export class GameApp {
   private loadingProgressTimeout?: number;
   private resizeObserver?: ResizeObserver;
   private running = false;
+  private mapOpen = false;
+  private readonly initialMapOpen: boolean;
 
   constructor(options: GameAppOptions) {
     this.renderer = createRenderer(options.canvas);
@@ -220,6 +226,7 @@ export class GameApp {
     this.hudRoot = options.hud;
     this.ui = options.ui;
     this.debugSpawn = options.debugSpawn;
+    this.initialMapOpen = options.initialMapOpen ?? false;
 
     this.previewRoot.name = "CharacterSelectStage";
     this.previewRoot.visible = false;
@@ -310,6 +317,8 @@ export class GameApp {
     this.ui.settingsClose.removeEventListener("click", this.closeSettings);
     this.ui.settingsAudio.removeEventListener("change", this.syncSettings);
     this.ui.settingsMotion.removeEventListener("change", this.syncSettings);
+    this.ui.miniMap.removeEventListener("click", this.toggleMap);
+    this.ui.mapClose.removeEventListener("click", this.closeMap);
     this.renderer.domElement.removeEventListener("pointerdown", this.handlePointerDown);
     this.renderer.domElement.removeEventListener("wheel", this.handleWheel);
     window.removeEventListener("pointermove", this.handlePointerMove);
@@ -334,6 +343,8 @@ export class GameApp {
     this.ui.settingsClose.addEventListener("click", this.closeSettings);
     this.ui.settingsAudio.addEventListener("change", this.syncSettings);
     this.ui.settingsMotion.addEventListener("change", this.syncSettings);
+    this.ui.miniMap.addEventListener("click", this.toggleMap);
+    this.ui.mapClose.addEventListener("click", this.closeMap);
   }
 
   private readonly openSettings = (): void => {
@@ -345,6 +356,23 @@ export class GameApp {
     this.ui.settingsPanel.classList.add("is-hidden");
     this.audio.playSelect();
   };
+
+  private readonly toggleMap = (): void => {
+    if (this.phase !== "playing") return;
+    this.setMapOpen(!this.mapOpen);
+  };
+
+  private readonly closeMap = (): void => {
+    this.setMapOpen(false);
+  };
+
+  private setMapOpen(open: boolean): void {
+    if (this.phase !== "playing" && open) return;
+    this.mapOpen = open;
+    this.ui.worldMapPanel.classList.toggle("is-hidden", !open);
+    this.hudRoot.classList.toggle("has-open-map", open);
+    this.audio.playSelect();
+  }
 
   private readonly syncSettings = (): void => {
     this.audio.setMuted(!this.ui.settingsAudio.checked);
@@ -455,16 +483,17 @@ export class GameApp {
     this.previewRoot.visible = false;
     this.playerCharacter.root.visible = true;
     this.syncPlayer(0);
-    if (this.debugSpawn) {
-      this.camera.position.copy(this.state.player.position).add(this.cameraOffset);
-      this.cameraLookTarget.copy(this.camera.position).add(this.cameraLookDirection);
-      this.camera.lookAt(this.cameraLookTarget);
-      this.camera.updateProjectionMatrix();
-    }
+    this.camera.position.copy(this.state.player.position).add(this.cameraOffset);
+    this.cameraLookTarget.copy(this.camera.position).add(this.cameraLookDirection);
+    this.camera.lookAt(this.cameraLookTarget);
+    this.camera.updateProjectionMatrix();
     updateQuest(this.state);
     this.syncUi();
     this.syncDialogue(0);
     this.hud.update(this.state);
+    if (this.initialMapOpen) {
+      this.setMapOpen(true);
+    }
   }
 
   private readonly tick = (): void => {
@@ -476,7 +505,7 @@ export class GameApp {
 
     if (this.phase === "playing") {
       const input = this.input.getVector();
-      if (this.dialogueState.active) {
+      if (this.dialogueState.active || this.mapOpen) {
         input.x = 0;
         input.z = 0;
         input.attack = false;
@@ -1076,6 +1105,9 @@ export class GameApp {
     this.setScreen(this.ui.loadingScreen, this.phase === "loading");
     this.setScreen(this.ui.characterSelect, this.phase === "characterSelect");
     this.hudRoot.classList.toggle("is-hidden", this.phase !== "playing");
+    if (this.phase !== "playing" && this.mapOpen) {
+      this.setMapOpen(false);
+    }
   }
 
   private syncCharacterPanel(): void {
@@ -1172,6 +1204,22 @@ export class GameApp {
 
   private readonly handleMenuKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
+
+    if (this.phase === "playing" && event.key.toLowerCase() === "m") {
+      event.preventDefault();
+      this.toggleMap();
+      return;
+    }
+
+    if (this.phase === "playing" && this.mapOpen && event.key === "Escape") {
+      event.preventDefault();
+      this.closeMap();
+      return;
+    }
+
+    if (this.phase === "playing" && this.mapOpen) {
+      return;
+    }
 
     if (this.phase === "playing" && this.dialogueState.active && (event.key === "Enter" || event.key === " " || event.key.toLowerCase() === "e")) {
       event.preventDefault();
