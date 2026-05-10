@@ -176,6 +176,10 @@ function shouldCullFromOpeningRoute(prop: WorldProp): boolean {
   const pathHalfWidth = pathWidthAt(prop.z) * 0.5;
   const distanceFromCenter = Math.abs(prop.x - pathCenterX(prop.z));
 
+  if (!prop.collides && (prop.kind === "marker" || prop.kind === "torch" || prop.kind === "fence")) {
+    return false;
+  }
+
   if (isOpeningBlockingKind(prop.kind)) {
     return distanceFromCenter < pathHalfWidth + 4.2 + prop.radius * 0.45;
   }
@@ -421,6 +425,7 @@ function addCoveStartProps(props: WorldProp[]): void {
   const coveProps = [
     ...openingRearWallProps(),
     ...openingSideProps(),
+    ...openingCoveLandmarkProps(),
     ...openingFlowerProps(),
   ];
 
@@ -435,6 +440,29 @@ function addCoveStartProps(props: WorldProp[]): void {
       variant: index % 4,
       collides: prop.collides,
     });
+  });
+}
+
+function openingCoveLandmarkProps(): Array<{ kind: WorldPropKind; x: number; z: number; scale: number; rotation: number; collides: boolean }> {
+  const rows = [
+    { z: -24.2, side: -1 as const, kind: "torch" as const, offset: 2.85, scale: 0.92, rotation: 0.18, collides: false },
+    { z: -23.4, side: 1 as const, kind: "marker" as const, offset: 2.95, scale: 0.7, rotation: -0.58, collides: false },
+    { z: -20.8, side: -1 as const, kind: "fence" as const, offset: 3.45, scale: 0.72, rotation: 1.18, collides: false },
+    { z: -19.6, side: 1 as const, kind: "rock" as const, offset: 3.7, scale: 0.64, rotation: 0.36, collides: true },
+    { z: -15.1, side: -1 as const, kind: "stump" as const, offset: 4.65, scale: 0.68, rotation: -0.1, collides: true },
+    { z: -14.5, side: 1 as const, kind: "log" as const, offset: 4.2, scale: 0.72, rotation: 0.92, collides: true },
+  ];
+
+  return rows.map((row) => {
+    const edge = pathWidthAt(row.z) * 0.5;
+    return {
+      kind: row.kind,
+      x: pathCenterX(row.z) + row.side * (edge + row.offset),
+      z: row.z,
+      scale: row.scale,
+      rotation: row.rotation,
+      collides: row.collides,
+    };
   });
 }
 

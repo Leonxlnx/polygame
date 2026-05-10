@@ -37,7 +37,7 @@ export type TutorialStage =
   | "returnRoute";
 
 export const GUIDE_NPC_POSITION = { x: -6.35, z: -0.55 } as const;
-const START_SPAWN_Z = OPENING_PATH_START_Z + 12.0;
+const START_SPAWN_Z = OPENING_PATH_START_Z + 16.0;
 const START_SPAWN_X = pathCenterX(START_SPAWN_Z);
 
 export type DialogueRequest = {
