@@ -34,13 +34,13 @@ type BranchPathSpec = {
 };
 
 const grassPalettes: Record<BiomeId, string[]> = {
-  village: ["#5d7644", "#657f4b", "#6b8551", "#718b57", "#58713f", "#637c49"],
-  meadow: ["#667f47", "#6f8950", "#769058", "#7c965e", "#5e783f", "#6c864d"],
-  pineForest: ["#435f36", "#4a673b", "#506e40", "#557445", "#3f5a32", "#4c6a3d"],
-  highland: ["#6d7855", "#747f5d", "#7c8765", "#68734f", "#83886a", "#717b5a"],
-  wetland: ["#506e55", "#587860", "#607f67", "#657f5d", "#4c6750", "#668168"],
+  village: ["#5a7241", "#627c48", "#6c8650", "#748d58", "#536c3c", "#67804a"],
+  meadow: ["#5f7a43", "#68844a", "#719052", "#78985a", "#58733d", "#6b864d"],
+  pineForest: ["#3e5b33", "#456438", "#4b6c3d", "#527343", "#39552f", "#48683b"],
+  highland: ["#687657", "#717e5f", "#7b8769", "#616f51", "#848b6d", "#6c7858"],
+  wetland: ["#4e6c55", "#57775e", "#5f8267", "#637e5e", "#496650", "#657f68"],
 };
-const pathPalette = ["#aa986e", "#b09f77", "#b6a77f", "#baa982", "#c0b088", "#ad9c73"];
+const pathPalette = ["#9f8b62", "#ad996d", "#b7a577", "#c2af80", "#d1be8a", "#a99468"];
 const waterPatches: WaterPatchSpec[] = [
   { x: -78, z: 58, rx: 6.9, rz: 3.6, rotation: -0.35, seed: 11 },
   { x: -96, z: 94, rx: 8.2, rz: 4.0, rotation: 0.22, seed: 23 },
@@ -63,12 +63,13 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
   const path = createPathMosaic(worldSize);
   const branches = createBranchPathMosaics();
   const edgeBlend = createPathEdgeBlend(worldSize);
+  const terraces = createVoxelTerraces();
   const shorelines = createWaterShorelines();
   const water = createWaterPatches();
   let props = createWorldPropObjects(worldProps);
   let hiddenSignature = "";
 
-  root.add(base.mesh, grass.mesh, openingGrass.mesh, biomeDetails.mesh, path.mesh, branches.mesh, edgeBlend.mesh, shorelines.mesh, water.root, props.root);
+  root.add(base.mesh, grass.mesh, openingGrass.mesh, biomeDetails.mesh, path.mesh, branches.mesh, edgeBlend.mesh, terraces.root, shorelines.mesh, water.root, props.root);
 
   return {
     root,
@@ -90,11 +91,117 @@ export function createTileWorld(worldSize = WORLD_SIZE): TileWorld {
       path.dispose();
       branches.dispose();
       edgeBlend.dispose();
+      terraces.dispose();
       shorelines.dispose();
       water.dispose();
       props.dispose();
     },
   };
+}
+
+function createVoxelTerraces(): { root: THREE.Group; dispose: () => void } {
+  const root = new THREE.Group();
+  root.name = "VoxelTerrainTerraces";
+
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const grassMaterial = new THREE.MeshStandardMaterial({ color: "#5f7a43", roughness: 0.98, flatShading: true });
+  const dirtMaterial = new THREE.MeshStandardMaterial({ color: "#826642", roughness: 0.98, flatShading: true });
+  const stoneMaterial = new THREE.MeshStandardMaterial({ color: "#7c7e70", roughness: 0.96, flatShading: true });
+  const sandMaterial = new THREE.MeshStandardMaterial({ color: "#c3ae77", roughness: 0.96, flatShading: true });
+  const maxPerLayer = 280;
+  const grass = new THREE.InstancedMesh(geometry, grassMaterial, maxPerLayer);
+  const dirt = new THREE.InstancedMesh(geometry, dirtMaterial, maxPerLayer);
+  const stone = new THREE.InstancedMesh(geometry, stoneMaterial, maxPerLayer);
+  const sand = new THREE.InstancedMesh(geometry, sandMaterial, maxPerLayer);
+  const layers = [grass, dirt, stone, sand];
+  const counts = new Map<THREE.InstancedMesh, number>(layers.map((mesh) => [mesh, 0]));
+
+  layers.forEach((mesh) => {
+    mesh.count = 0;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    root.add(mesh);
+  });
+
+  for (let step = 0; step < 66; step += 1) {
+    const z = OPENING_PATH_START_Z - 2 + step * 2.9;
+    if (z > 144) break;
+
+    ([-1, 1] as const).forEach((side) => {
+      const roll = valueNoise(step * 37, side * 101);
+      if (roll < 0.42 && z > -24) return;
+
+      const edge = pathWidthAt(z) * 0.5;
+      const blockDepth = 0.38 + valueNoise(step * 41, side * 113) * 0.82;
+      const blockLength = 0.82 + valueNoise(step * 43, side * 127) * 1.62;
+      const x = pathCenterX(z) + side * (edge + 0.62 + blockDepth * 0.5 + (valueNoise(step * 47, side * 131) - 0.5) * 0.42);
+      const y = terrainHeight(x, z) + 0.066 + valueNoise(step * 53, side * 137) * 0.035;
+      const rotation = (valueNoise(step * 59, side * 139) - 0.5) * 0.44;
+      const biome = biomeAt(x, z);
+      const height = biome === "highland" ? 0.18 : biome === "pineForest" ? 0.14 : 0.11;
+      const primary = biome === "highland" || (z < OPENING_PATH_START_Z + 5 && roll > 0.58) ? stone : grass;
+      addTerraceInstance(primary, counts, x, y + height * 0.5, z, blockLength, height, blockDepth, rotation);
+
+      if (roll > 0.62) {
+        const insetX = x + side * (0.12 + blockDepth * 0.16);
+        addTerraceInstance(dirt, counts, insetX, y - 0.015, z + 0.12, blockLength * 0.66, 0.075, Math.max(0.24, blockDepth * 0.38), rotation + side * 0.08);
+      }
+
+      if (roll > 0.78 && Math.abs(z) < 70) {
+        const lipX = pathCenterX(z) + side * (edge - 0.18);
+        addTerraceInstance(sand, counts, lipX, terrainHeight(lipX, z) + 0.112, z + side * 0.03, blockLength * 0.38, 0.032, 0.24, rotation);
+      }
+    });
+  }
+
+  for (let block = 0; block < 18; block += 1) {
+    const side = block % 2 === 0 ? -1 : 1;
+    const z = OPENING_PATH_START_Z - 4.2 + Math.floor(block / 2) * 0.92;
+    const edge = pathWidthAt(z) * 0.5;
+    const x = pathCenterX(z) + side * (edge + 3.4 + valueNoise(block, 1701) * 1.5);
+    const scale = 0.88 + valueNoise(block, 1707) * 0.86;
+    addTerraceInstance(stone, counts, x, terrainHeight(x, z) + 0.12 * scale, z, 0.92 * scale, 0.24 * scale, 0.74 * scale, valueNoise(block, 1711) * Math.PI);
+  }
+
+  layers.forEach((mesh) => {
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  });
+
+  return {
+    root,
+    dispose: () => {
+      geometry.dispose();
+      grassMaterial.dispose();
+      dirtMaterial.dispose();
+      stoneMaterial.dispose();
+      sandMaterial.dispose();
+    },
+  };
+}
+
+function addTerraceInstance(
+  mesh: THREE.InstancedMesh,
+  counts: Map<THREE.InstancedMesh, number>,
+  x: number,
+  y: number,
+  z: number,
+  width: number,
+  height: number,
+  depth: number,
+  rotation: number,
+): void {
+  const index = counts.get(mesh) ?? 0;
+  if (index >= mesh.instanceMatrix.count) return;
+
+  const matrix = new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotation, 0)),
+    new THREE.Vector3(width, height, depth),
+  );
+  mesh.setMatrixAt(index, matrix);
+  counts.set(mesh, index + 1);
+  mesh.count = index + 1;
 }
 
 function propId(prop: { kind: string }, index: number): string {

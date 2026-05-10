@@ -32,7 +32,7 @@ export type TutorialStage =
   | "chooseNextTrail";
 
 export const GUIDE_NPC_POSITION = { x: -6.35, z: -0.55 } as const;
-const START_SPAWN_Z = OPENING_PATH_START_Z + 1.15;
+const START_SPAWN_Z = OPENING_PATH_START_Z + 6.8;
 const START_SPAWN_X = pathCenterX(START_SPAWN_Z);
 
 export type DialogueRequest = {
