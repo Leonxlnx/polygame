@@ -167,6 +167,10 @@ function stageRank(stage: TutorialStage): number {
     "firstCampReady",
     "openTrailCache",
     "chooseNextTrail",
+    "stoneRoute",
+    "reedRoute",
+    "pineRoute",
+    "returnRoute",
   ];
   return order.indexOf(stage);
 }
@@ -208,6 +212,14 @@ function chapterLabel(stage: TutorialStage): string {
     case "openTrailCache":
     case "chooseNextTrail":
       return "Trail Opens";
+    case "stoneRoute":
+      return "Stone Rise";
+    case "reedRoute":
+      return "Reedfen";
+    case "pineRoute":
+      return "Pinewood";
+    case "returnRoute":
+      return "Route Report";
   }
 }
 

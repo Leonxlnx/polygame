@@ -1,5 +1,5 @@
 import type { InputVector } from "../input/InputController";
-import { GUIDE_NPC_POSITION, requestDialogue, type EnemyState, type GameState, type HotbarSlot, type ResourceNode, type ToolMotion } from "./GameState";
+import { GUIDE_NPC_POSITION, requestDialogue, type EnemyState, type GameState, type HotbarSlot, type ResourceNode, type RouteChoice, type ToolMotion } from "./GameState";
 import type { WorldCollider } from "../content/worldProps";
 import { biomeAt, biomeLabel } from "../content/worldMap";
 
@@ -482,6 +482,10 @@ function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
     }
   }
 
+  if (advanceRouteSurveyAfterGather(state, node.resource)) {
+    return;
+  }
+
   if (node.resource === "coin" && node.kind === "chest" && state.quest.tutorialStage === "openTrailCache") {
     state.quest.tutorialStage = "chooseNextTrail";
     cueChapter(state, "Choice Opens", "Three Trails");
@@ -498,6 +502,31 @@ function finishResourceNodeUse(state: GameState, node: ResourceNode): void {
 
   const label = node.resource === "coin" ? "coins" : node.resource;
   showMessage(state, `Collected ${node.amount} ${label}.`);
+}
+
+function advanceRouteSurveyAfterGather(state: GameState, resource: keyof GameState["resources"]): boolean {
+  if (state.quest.tutorialStage === "stoneRoute" && resource === "stone" && routeResourceCount(state, "stone") >= 6) {
+    state.quest.tutorialStage = "returnRoute";
+    cueChapter(state, "Stone Report", "Return to Edda");
+    showMessage(state, "Enough fresh stone surveyed. Return to Edda.");
+    return true;
+  }
+
+  if (state.quest.tutorialStage === "reedRoute" && resource === "herb" && routeResourceCount(state, "reed") >= 5) {
+    state.quest.tutorialStage = "returnRoute";
+    cueChapter(state, "Reed Report", "Return to Edda");
+    showMessage(state, "Enough useful plants gathered. Return to Edda.");
+    return true;
+  }
+
+  if (state.quest.tutorialStage === "pineRoute" && resource === "wood" && routeResourceCount(state, "pine") >= 8) {
+    state.quest.tutorialStage = "returnRoute";
+    cueChapter(state, "Pine Report", "Return to Edda");
+    showMessage(state, "Enough trail timber cut. Return to Edda.");
+    return true;
+  }
+
+  return false;
 }
 
 function isTreeNode(node: ResourceNode): boolean {
@@ -895,11 +924,30 @@ export function updateQuest(state: GameState): void {
     case "chooseNextTrail":
       state.quest.currentObjective = "Choose a future route: east stone, west reeds, or north pine.";
       break;
+    case "stoneRoute":
+      state.quest.currentObjective = `Survey Stone Rise: mine fresh stone (${routeResourceCount(state, "stone")} / 6).`;
+      break;
+    case "reedRoute":
+      state.quest.currentObjective = `Survey Reedfen: gather useful plants (${routeResourceCount(state, "reed")} / 5).`;
+      break;
+    case "pineRoute":
+      state.quest.currentObjective = `Survey Pinewood: cut trail timber (${routeResourceCount(state, "pine")} / 8).`;
+      break;
+    case "returnRoute":
+      state.quest.currentObjective = "Return to Edda with the route report.";
+      break;
   }
 }
 
 function isGuideNearby(state: GameState): boolean {
   return Math.hypot(state.player.position.x - GUIDE_NPC_POSITION.x, state.player.position.z - GUIDE_NPC_POSITION.z) < 1.9;
+}
+
+function routeResourceCount(state: GameState, route: RouteChoice): number {
+  if (route === "stone") return Math.max(0, state.resources.stone - state.quest.routeStoneStart);
+  if (route === "reed") return Math.max(0, state.resources.herb - state.quest.routeHerbStart);
+  if (route === "pine") return Math.max(0, state.resources.wood - state.quest.routeWoodStart);
+  return 0;
 }
 
 function talkToGuide(state: GameState): void {
@@ -1087,6 +1135,40 @@ function talkToGuide(state: GameState): void {
         "The next build should choose one of those routes and make it deep instead of throwing all three at you at once.",
       ]);
       break;
+    case "stoneRoute":
+      requestDialogue(state, "Edda", [
+        `Stone Rise report: ${routeResourceCount(state, "stone")} of 6 fresh stone.`,
+        "Mine only what the ridge offers near the marked trail. Do not strip the whole slope.",
+        "This route should become our first puzzle spine: pressure plates, cracked walls, and old stone doors.",
+      ]);
+      break;
+    case "reedRoute":
+      requestDialogue(state, "Edda", [
+        `Reedfen report: ${routeResourceCount(state, "reed")} of 5 useful plants.`,
+        "Soft ground teaches patience. Move around water, read the reeds, then gather what can heal the camp.",
+        "Later this route should become fishing, herbs, boats, and quiet enemies you hear before you see.",
+      ]);
+      break;
+    case "pineRoute":
+      requestDialogue(state, "Edda", [
+        `Pinewood report: ${routeResourceCount(state, "pine")} of 8 trail timber.`,
+        "Take timber with intent. Fell a tree, collect the cut wood, and make sure the space you cleared can be crossed.",
+        "This route should grow into cabins, cold nights, better tools, and survival loops.",
+      ]);
+      break;
+    case "returnRoute":
+      state.quest.routeComplete = true;
+      state.quest.tutorialStage = "chooseNextTrail";
+      state.quest.routeChoice = "";
+      cueChapter(state, "Route Logged", "Valley Map Updated");
+      requestDialogue(state, "Edda", [
+        "Good. That is a real report, not sightseeing.",
+        "The route now has a reason to exist: material, danger, and a future mechanic.",
+        "We can deepen one branch next instead of making a noisy map full of things that do nothing.",
+        "For now, choose another route or keep improving the camp. The valley should open because your actions made sense.",
+      ]);
+      showMessage(state, "Route report logged.");
+      break;
   }
 }
 
@@ -1173,6 +1255,23 @@ function activeChecklist(state: GameState, woodCount: string, stoneCount: string
         { label: "West reedfen", complete: false },
         { label: "North pinewood", complete: false },
       ];
+    case "stoneRoute":
+      return [
+        { label: `Fresh stone ${Math.min(routeResourceCount(state, "stone"), 6)} / 6`, complete: routeResourceCount(state, "stone") >= 6 },
+        { label: "Return report", complete: false },
+      ];
+    case "reedRoute":
+      return [
+        { label: `Useful plants ${Math.min(routeResourceCount(state, "reed"), 5)} / 5`, complete: routeResourceCount(state, "reed") >= 5 },
+        { label: "Return report", complete: false },
+      ];
+    case "pineRoute":
+      return [
+        { label: `Trail timber ${Math.min(routeResourceCount(state, "pine"), 8)} / 8`, complete: routeResourceCount(state, "pine") >= 8 },
+        { label: "Return report", complete: false },
+      ];
+    case "returnRoute":
+      return [{ label: "Speak with Edda", complete: false }];
   }
 }
 
@@ -1186,6 +1285,54 @@ function updateBiomeContext(state: GameState): void {
 
   state.world.currentBiome = biome;
   showMessage(state, `Entered ${biomeLabel(biome)}.`);
+
+  if (state.quest.tutorialStage !== "chooseNextTrail") return;
+
+  if (biome === "highland") {
+    startRouteSurvey(state, "stone");
+  } else if (biome === "wetland") {
+    startRouteSurvey(state, "reed");
+  } else if (biome === "pineForest") {
+    startRouteSurvey(state, "pine");
+  }
+}
+
+function startRouteSurvey(state: GameState, route: Exclude<RouteChoice, "">): void {
+  state.quest.routeChoice = route;
+  state.quest.routeWoodStart = state.resources.wood;
+  state.quest.routeStoneStart = state.resources.stone;
+  state.quest.routeHerbStart = state.resources.herb;
+  state.quest.routeComplete = false;
+
+  if (route === "stone") {
+    state.quest.tutorialStage = "stoneRoute";
+    cueChapter(state, "Route Chosen", "Stone Rise");
+    requestDialogue(state, "Trail Notes", [
+      "The ground hardens under your feet.",
+      "Goal: mine six fresh pieces of stone from this route, then return to Edda.",
+      "Later this branch should become the place for climbing, cracked walls, and stone puzzles.",
+    ]);
+    return;
+  }
+
+  if (route === "reed") {
+    state.quest.tutorialStage = "reedRoute";
+    cueChapter(state, "Route Chosen", "Reedfen");
+    requestDialogue(state, "Trail Notes", [
+      "The air turns wet and quiet.",
+      "Goal: gather five useful plants from this route, then return to Edda.",
+      "Later this branch should teach water, fishing, boats, and soft-ground danger.",
+    ]);
+    return;
+  }
+
+  state.quest.tutorialStage = "pineRoute";
+  cueChapter(state, "Route Chosen", "Pinewood");
+  requestDialogue(state, "Trail Notes", [
+    "The forest grows colder and taller.",
+    "Goal: cut eight fresh timber from this route, then return to Edda.",
+    "Later this branch should unlock cabins, cold nights, better axes, and survival systems.",
+  ]);
 }
 
 function showMessage(state: GameState, message: string): void {

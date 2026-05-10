@@ -7,6 +7,7 @@ export type ResourceKind = "wood" | "stone" | "herb" | "coin";
 export type EnemyKind = "trailGuardian" | "boar" | "stoneSentinel" | "reedWisp";
 export type HotbarSlot = "hands" | "tool" | "build" | "attack" | "pack";
 export type ToolMotion = "hands" | "pick" | "axe" | "sword" | "build";
+export type RouteChoice = "" | "stone" | "reed" | "pine";
 export type TutorialStage =
   | "wakeInCove"
   | "walkToGuide"
@@ -29,10 +30,14 @@ export type TutorialStage =
   | "returnGuardian"
   | "firstCampReady"
   | "openTrailCache"
-  | "chooseNextTrail";
+  | "chooseNextTrail"
+  | "stoneRoute"
+  | "reedRoute"
+  | "pineRoute"
+  | "returnRoute";
 
 export const GUIDE_NPC_POSITION = { x: -6.35, z: -0.55 } as const;
-const START_SPAWN_Z = OPENING_PATH_START_Z + 6.8;
+const START_SPAWN_Z = OPENING_PATH_START_Z + 12.0;
 const START_SPAWN_X = pathCenterX(START_SPAWN_Z);
 
 export type DialogueRequest = {
@@ -140,6 +145,11 @@ export type GameState = {
     attackPracticed: boolean;
     enemyDefeated: boolean;
     combatUnlocked: boolean;
+    routeChoice: RouteChoice;
+    routeWoodStart: number;
+    routeStoneStart: number;
+    routeHerbStart: number;
+    routeComplete: boolean;
     campLevel: number;
     toolLevel: number;
     currentObjective: string;
@@ -226,6 +236,11 @@ export function createGameState(): GameState {
       attackPracticed: false,
       enemyDefeated: false,
       combatUnlocked: false,
+      routeChoice: "",
+      routeWoodStart: 0,
+      routeStoneStart: 0,
+      routeHerbStart: 0,
+      routeComplete: false,
       campLevel: 0,
       toolLevel: 0,
       currentObjective: "Walk out of the cove.",
